@@ -108,12 +108,24 @@ def test_filler_field_earns_no_points(field, value):
     assert result["penalties"][0]["points"] == sum(item["points"] for item in result["breakdown"])
 
 
-@pytest.mark.parametrize("value", ["кртмпл", "аааааа"])
+@pytest.mark.parametrize("value", ["кртмпл", "аааааа", "ывпрдлж", "ывпрдлж ывпрдлж ывпрдлж"])
 def test_gibberish_field_earns_no_points(value):
     result = rating.score({"users": value})
     assert result["score"] == 0
     assert result["penalties"][0]["key"] == "gibberish"
     assert result["penalties"][0]["points"] == 6
+
+
+def test_three_repeated_words_are_gibberish_even_with_vowels():
+    result = rating.score({"users": "команда команда команда"})
+    assert result["score"] == 0
+    assert result["penalties"][0]["key"] == "gibberish"
+
+
+@pytest.mark.parametrize("value", ["CSV, API", "SQL-выгрузка"])
+def test_technical_shorthand_is_not_gibberish(value):
+    assert rating._gibberish(value) is False
+    assert all(penalty["key"] != "gibberish" for penalty in rating.score({"data": value})["penalties"])
 
 
 def test_short_honest_success_criterion_is_not_penalized():

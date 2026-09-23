@@ -71,16 +71,25 @@ def seed(conn: sqlite3.Connection) -> None:
              f"-{c['id']} hours"),
         )
         if score is not None:
+            # история роста рейтинга из сида; последняя точка — всегда подтверждённый итог по формуле
+            steps = [h for h in c.get("history", []) if h.get("event") != "confirm"]
+            for h in steps:
+                conn.execute(
+                    "INSERT INTO rating_event (task_id, event, score, level) VALUES (?,?,?,?)",
+                    (c["id"], h["event"], h["score"], rating.level(h["score"])[0]),
+                )
             conn.execute(
                 "INSERT INTO rating_event (task_id, event, score, level, confirmed) VALUES (?, 'confirm', ?, ?, 1)",
                 (c["id"], score, level),
             )
     for p in load("proposals"):
+        decided = p.get("decided_hours") if p.get("status", "submitted") != "submitted" else None
         conn.execute(
-            """INSERT INTO proposal (task_id, team_id, idea, plan, timeline, link, status)
-               VALUES (?,?,?,?,?,?,?)""",
+            """INSERT INTO proposal (task_id, team_id, idea, plan, timeline, link, status, created_at, decided_at)
+               VALUES (?,?,?,?,?,?,?, datetime('now', '-30 hours'),
+                       CASE WHEN ? IS NULL THEN NULL ELSE datetime('now', '-30 hours', printf('+%d hours', ?)) END)""",
             (p["task_id"], p["team_id"], p["idea"], p["plan"], p["timeline"], p["link"],
-             p.get("status", "submitted")),
+             p.get("status", "submitted"), decided, decided),
         )
     conn.commit()
 

@@ -6,7 +6,8 @@
       "title": "Прогноз полива", "context": "Полив полей планируем вручную", "need": "Нужен прогноз полива",
       "users": "", "data": "Есть датчики влажности", "constraints": "", "expected_result": "",
       "success_criteria": "", "contact": "agro@example.kz", "interaction_format": ""
-    }
+    },
+    "history": [{"event": "draft", "score": 6}, {"event": "answers", "score": 20}, {"event": "confirm", "score": 32}]
   },
   {
     "id": 2, "business_id": 2, "industry": "Ритейл",
@@ -16,7 +17,8 @@
       "users": "Сотрудники магазина", "data": "Выгрузка касс из CRM", "constraints": "Доступ только для сотрудников",
       "expected_result": "Панель продаж для сотрудников", "success_criteria": "Время подготовки отчёта",
       "contact": "market@example.kz", "interaction_format": "Онлайн встречи с менеджером"
-    }
+    },
+    "history": [{"event": "draft", "score": 12}, {"event": "answers", "score": 42}, {"event": "confirm", "score": 62}]
   },
   {
     "id": 3, "business_id": 3, "industry": "Логистика",
@@ -28,7 +30,8 @@
       "expected_result": "Панель маршрутов для диспетчера с картой заказов",
       "success_criteria": "Время построения маршрутов не более 15 минут",
       "contact": "logistics@example.kz", "interaction_format": ""
-    }
+    },
+    "history": [{"event": "draft", "score": 18}, {"event": "answers", "score": 55}, {"event": "confirm", "score": 80}]
   },
   {
     "id": 4, "business_id": 4, "industry": "Образование",
@@ -42,7 +45,8 @@
       "expected_result": "Панель посещаемости для учебных групп и методистов",
       "success_criteria": "Время подготовки отчёта не больше 5 минут",
       "contact": "orbit@example.kz", "interaction_format": "Еженедельные встречи с методистом"
-    }
+    },
+    "history": [{"event": "draft", "score": 15}, {"event": "answers", "score": 67}, {"event": "confirm", "score": 94}]
   },
   {
     "id": 5, "business_id": 5, "industry": "Финансы",
@@ -56,6 +60,7 @@
       "expected_result": "Панель сверки для аналитиков финансовой службы",
       "success_criteria": "Точность сверки не ниже 98%",
       "contact": "finflow@example.kz", "interaction_format": "Еженедельные встречи с финансовым менеджером"
-    }
+    },
+    "history": [{"event": "draft", "score": 14}, {"event": "answers", "score": 52}, {"event": "confirm", "score": 87}]
   }
 ]

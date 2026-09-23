@@ -1,7 +1,7 @@
 [
   {"task_id": 1, "team_id": 1, "idea": "Прогноз влажности по данным датчиков", "plan": "1) анализ датчиков 2) модель 3) экран прогноза", "timeline": "3 недели", "link": "https://example.com/datacats/irrigation", "status": "submitted"},
-  {"task_id": 2, "team_id": 2, "idea": "Единая панель продаж магазинов", "plan": "1) схема данных 2) графики 3) пилот", "timeline": "2 недели", "link": "https://example.com/retail-pulse/sales", "status": "submitted"},
-  {"task_id": 3, "team_id": 3, "idea": "Оптимизация маршрутов с картой", "plan": "1) адреса 2) алгоритм 3) проверка с диспетчером", "timeline": "4 недели", "link": "https://example.com/routelab/routes", "status": "submitted"},
-  {"task_id": 4, "team_id": 4, "idea": "Панель посещаемости для методистов", "plan": "1) очистка журнала 2) интерфейс 3) пилот", "timeline": "3 недели", "link": "https://example.com/eduvector/attendance", "status": "submitted"},
-  {"task_id": 5, "team_id": 5, "idea": "Проверка расхождений платежей", "plan": "1) правила 2) сервис сверки 3) метрики", "timeline": "5 недель", "link": "https://example.com/fincraft/payments", "status": "submitted"}
+  {"task_id": 2, "team_id": 2, "idea": "Единая панель продаж магазинов", "plan": "1) схема данных 2) графики 3) пилот", "timeline": "2 недели", "link": "https://example.com/retail-pulse/sales", "status": "accepted", "decided_hours": 3},
+  {"task_id": 3, "team_id": 3, "idea": "Оптимизация маршрутов с картой", "plan": "1) адреса 2) алгоритм 3) проверка с диспетчером", "timeline": "4 недели", "link": "https://example.com/routelab/routes", "status": "rejected", "decided_hours": 6},
+  {"task_id": 4, "team_id": 4, "idea": "Панель посещаемости для методистов", "plan": "1) очистка журнала 2) интерфейс 3) пилот", "timeline": "3 недели", "link": "https://example.com/eduvector/attendance", "status": "accepted", "decided_hours": 2},
+  {"task_id": 5, "team_id": 5, "idea": "Проверка расхождений платежей", "plan": "1) правила 2) сервис сверки 3) метрики", "timeline": "5 недель", "link": "https://example.com/fincraft/payments", "status": "rejected", "decided_hours": 12}
 ]

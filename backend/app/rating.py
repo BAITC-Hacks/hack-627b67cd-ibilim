@@ -146,7 +146,12 @@ def _gibberish(value: str) -> bool:
     letters = re.findall(r"[a-zа-яёәіөүұ]+", value.lower())
     if not letters:
         return False
+    if any(a == b == c for a, b, c in zip(letters, letters[1:], letters[2:])):
+        return True
     if any(_REPEATED.search(word) for word in letters):
+        return True
+    if any(len(word) > 5 and 5 * sum(char in _VOWELS for char in word) < len(word)
+           for word in letters):
         return True
     return any(len(word) >= 4 for word in letters) and not any(
         char in _VOWELS for word in letters for char in word
