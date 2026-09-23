@@ -5,6 +5,7 @@ import Loader from '../components/Loader.jsx'
 import ErrorBox from '../components/ErrorBox.jsx'
 import RatingPanel from '../components/RatingPanel.jsx'
 import PrivacyNotice from '../components/PrivacyNotice.jsx'
+import AiWarnings from '../components/AiWarnings.jsx'
 import CardEditor from './CardEditor.jsx'
 
 export default function Clarify({ id }) {
@@ -55,7 +56,7 @@ export default function Clarify({ id }) {
     <h1>Уточним детали задачи</h1>
     <p className="flow-lead">ИИ использует только факты из вашего текста и ответов. Отвечайте на то, что уже знаете; остальные вопросы можно пропустить.</p>
     {task.ai?.mode === 'stub' && <div className="notice-box" role="status">ИИ недоступен, работает локальная заглушка</div>}
-    {!!task.ai?.warnings?.length && <div className="warning-box"><strong>Что требует проверки</strong><ul>{task.ai.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></div>}
+    <AiWarnings warnings={task.ai?.warnings} />
     <PrivacyNotice findings={task.privacy} fieldLabel={fieldLabel} />
     <div className="task-layout"><div className="task-main">
       <div className="surface draft-card"><span className="section-kicker">ВАШ ЧЕРНОВИК · {task.industry}</span><p>{task.draft_text}</p></div>

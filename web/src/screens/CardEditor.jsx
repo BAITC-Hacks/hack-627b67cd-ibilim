@@ -7,6 +7,7 @@ import RatingPanel from '../components/RatingPanel.jsx'
 import RatingTimeline from '../components/RatingTimeline.jsx'
 import PrivacyNotice from '../components/PrivacyNotice.jsx'
 import StudentCheck from '../components/StudentCheck.jsx'
+import AiWarnings from '../components/AiWarnings.jsx'
 
 export default function CardEditor({ task, onTaskChange }) {
   const { meta } = useApp()
@@ -87,7 +88,7 @@ export default function CardEditor({ task, onTaskChange }) {
     <p className="flow-lead">Уточняйте поля по подсказкам рейтинга. Значок цитаты показывает исходный текст, на котором основан ответ ИИ.</p>
     <ErrorBox message={error} />
     {task.ai?.mode === 'stub' && <div className="notice-box">ИИ недоступен, работает локальная заглушка</div>}
-    {!!task.ai?.warnings?.length && <div className="warning-box"><strong>Что требует проверки</strong><ul>{task.ai.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></div>}
+    <AiWarnings warnings={task.ai?.warnings} />
     <PrivacyNotice findings={task.privacy} fieldLabel={(key) => key === 'draft' ? 'Черновик' : meta?.fields?.find((field) => field.key === key)?.label || key} />
     <div className="timeline-section"><div className="section-heading"><div><span className="section-kicker">КАК ЗАДАЧА СТАЛА ЯСНЕЕ</span><h2>Рост рейтинга</h2></div><span>История изменений</span></div><RatingTimeline history={task.history} /></div>
     <div className="task-layout"><div className="task-main">
