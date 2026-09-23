@@ -1,14 +1,18 @@
-"""SQLite: подключение, схема, сид демо-данных."""
+"""SQLite: подключение, схема, синтетические данные из seed/*.json (ТЗ §6)."""
 
 import json
 import os
 import sqlite3
 from pathlib import Path
 
+from . import rating
+
 ROOT = Path(__file__).resolve().parents[2]
-DB_PATH = Path(os.getenv("DB_PATH", ROOT / "backend" / "ibilim.db"))
+DB_PATH = Path(os.getenv("DB_PATH", "ibilim.db"))
+if not DB_PATH.is_absolute():  # относительный путь — от backend/, а не от папки запуска
+    DB_PATH = ROOT / "backend" / DB_PATH
 SCHEMA = Path(__file__).with_name("schema.sql")
-SEED_OBJECTIVES = ROOT / "seed" / "objectives.7.algebra.json"
+SEED = ROOT / "seed"
 
 
 def connect() -> sqlite3.Connection:
@@ -22,67 +26,67 @@ def init() -> None:
     conn = connect()
     conn.executescript(SCHEMA.read_text(encoding="utf-8"))
     conn.commit()
-    if conn.execute("SELECT COUNT(*) AS n FROM objective").fetchone()["n"] == 0:
+    if conn.execute("SELECT COUNT(*) AS n FROM business").fetchone()["n"] == 0:
         seed(conn)
     conn.close()
 
 
+def load(name: str) -> list[dict]:
+    """seed/<name>.json → список; нет файла — пустой список."""
+    path = SEED / f"{name}.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+
+
+def _json(value) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
 def seed(conn: sqlite3.Connection) -> None:
-    """Демо-класс 7А: 12 учеников тремя профилями, чтобы персональная домашка была видимо разной."""
-    data = json.loads(SEED_OBJECTIVES.read_text(encoding="utf-8"))
-    for obj in data["objectives"]:
+    """Бизнесы, команды, опубликованные карточки и отклики. Официальный рейтинг карточек
+    считает rating.score — тот же код, что и в работе, чтобы каталог не расходился с формулой."""
+    for b in load("businesses"):
         conn.execute(
-            """INSERT OR REPLACE INTO objective
-               (code, grade, subject, section, subsection, quarter, hours, order_index,
-                text_ru, text_kk, prerequisites, source)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (
-                obj["code"], data["grade"], data["subject"], obj.get("section"),
-                obj.get("subsection"), obj.get("quarter"), obj.get("hours", 0),
-                obj.get("order_index", 0), obj["text_ru"], obj.get("text_kk", ""),
-                json.dumps(obj.get("prerequisites", []), ensure_ascii=False),
-                obj.get("source", "DRAFT"),
-            ),
+            "INSERT INTO business (id, name, industry, contact) VALUES (?,?,?,?)",
+            (b["id"], b["name"], b.get("industry"), b.get("contact")),
         )
-
-    conn.execute(
-        "INSERT OR REPLACE INTO klass (id, name, grade, subject, language) VALUES (1, '7А', 7, 'Алгебра', 'ru')"
-    )
-    conn.execute(
-        "INSERT OR REPLACE INTO calendar (id, quarter, starts_on, ends_on, holidays)"
-        " VALUES (1, 1, '2026-09-01', '2026-10-25', '[]')"
-    )
-    for weekday, lesson_no in ((1, 3), (3, 2), (5, 4)):
+    for t in load("teams"):
         conn.execute(
-            "INSERT INTO schedule_slot (klass_id, weekday, lesson_no) VALUES (1, ?, ?)",
-            (weekday, lesson_no),
+            "INSERT INTO team (id, name, interests, skills, technologies) VALUES (?,?,?,?,?)",
+            (t["id"], t["name"], _json(t.get("interests", [])), _json(t.get("skills", [])),
+             _json(t.get("technologies", []))),
         )
-
-    # профили: strong / medium / weak — weak проваливает 7.2.1.4, это главный кадр демо
-    roster = [
-        ("Айдар", "weak"), ("Дана", "weak"), ("Алишер", "medium"), ("Камила", "medium"),
-        ("Ержан", "medium"), ("Аружан", "strong"), ("Тимур", "strong"), ("Мадина", "medium"),
-        ("Санжар", "weak"), ("Айсулу", "medium"), ("Нурлан", "strong"), ("Жанель", "medium"),
-    ]
-    levels = {"strong": 0.88, "medium": 0.62, "weak": 0.28}
-    codes = [row["code"] for row in conn.execute(
-        "SELECT code FROM objective WHERE quarter = 1 ORDER BY order_index"
-    )]
-    for name, profile in roster:
-        cur = conn.execute("INSERT INTO student (klass_id, name) VALUES (1, ?)", (name,))
-        student_id = cur.lastrowid
-        for code in codes[:3]:  # уже пройденные цели раздела
-            value = levels[profile]
-            if profile == "weak" and code == "7.2.1.3":
-                value = 0.20
+    for c in load("cards"):
+        card = {field: c["card"].get(field, "") for field in rating.FIELDS}
+        try:
+            r = rating.score(card)
+            score, level = r["score"], r["level"]
+        except NotImplementedError:  # рейтинг ещё не написан — карточка без балла
+            score, level = None, None
+        conn.execute(
+            """INSERT INTO task (id, business_id, industry, draft_text, status, card, sources,
+                                 confirmed, confirmed_card, score, level, published_at)
+               VALUES (?,?,?,?, 'published', ?,?, 1, ?,?,?, datetime('now', ?))""",
+            (c["id"], c["business_id"], c.get("industry"), c.get("draft_text", ""), _json(card),
+             _json({f: "manual" for f, v in card.items() if v}), _json(card), score, level,
+             f"-{c['id']} hours"),
+        )
+        if score is not None:
             conn.execute(
-                "INSERT OR REPLACE INTO mastery (student_id, objective_code, value, attempts)"
-                " VALUES (?,?,?,?)",
-                (student_id, code, value, 3),
+                "INSERT INTO rating_event (task_id, event, score, level, confirmed) VALUES (?, 'confirm', ?, ?, 1)",
+                (c["id"], score, level),
             )
+    for p in load("proposals"):
+        conn.execute(
+            """INSERT INTO proposal (task_id, team_id, idea, plan, timeline, link, status)
+               VALUES (?,?,?,?,?,?,?)""",
+            (p["task_id"], p["team_id"], p["idea"], p["plan"], p["timeline"], p["link"],
+             p.get("status", "submitted")),
+        )
     conn.commit()
 
 
 if __name__ == "__main__":
+    for suffix in ("", "-wal", "-shm"):
+        Path(f"{DB_PATH}{suffix}").unlink(missing_ok=True)
     init()
-    print(f"db ready: {DB_PATH}")
+    print(f"db recreated: {DB_PATH}")

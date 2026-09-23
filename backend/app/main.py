@@ -1,24 +1,74 @@
-"""iBilim API. Контракт заморожен в docs/04-api.md — правки только через него.
-
-Роуты ниже реализованы по минимуму (health, классы, план); остальные — заглушки с
-правильными сигнатурами, чтобы фронт мог подключаться сразу, а логика доезжала следом.
-"""
+"""AI Sana Challenge Hub — API. Контракт заморожен в docs/02-api.md, правки только через него."""
 
 import json
-import os
+from contextlib import contextmanager
+from http import HTTPStatus
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import db
+from . import ai, catalog, db, llm, proposals, rating, tasks
+from .errors import BadRequest, Conflict, NotFound
 
 ROOT = Path(__file__).resolve().parents[2]
 WEB_DIST = ROOT / "web" / "dist"
 
-app = FastAPI(title="iBilim", version="0.1.0")
+app = FastAPI(title="AI Sana Challenge Hub", version="0.2.0")
+
+
+# --- ошибки в формате контракта: {"error": {"code": "...", "message": "..."}} -------------
+
+def _error(status: int, code: str, message: str) -> JSONResponse:
+    return JSONResponse({"error": {"code": code, "message": message}}, status_code=status)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    code = HTTPStatus(exc.status_code).phrase.lower().replace(" ", "_")  # 404 → not_found
+    return _error(exc.status_code, code, str(exc.detail))
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    message = "; ".join(f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in exc.errors())
+    return _error(422, "validation_error", message)
+
+
+@app.exception_handler(Exception)
+async def internal_error(request: Request, exc: Exception) -> JSONResponse:
+    return _error(500, "internal_error", str(exc))
+
+
+def _domain_handler(status: int, code: str):
+    async def handler(request: Request, exc: Exception) -> JSONResponse:
+        return _error(status, code, str(exc) or code)
+    return handler
+
+
+# модули бросают доменные ошибки и ничего не знают про HTTP
+for _exc, _status, _code in (
+    (NotFound, 404, "not_found"),
+    (Conflict, 409, "conflict"),
+    (BadRequest, 400, "bad_request"),
+    (NotImplementedError, 501, "not_implemented"),
+):
+    app.add_exception_handler(_exc, _domain_handler(_status, _code))
+
+
+@contextmanager
+def _tx():
+    """Соединение на запрос: commit при успехе, rollback при ошибке. Модули сами не коммитят."""
+    conn = db.connect()
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 @app.on_event("startup")
@@ -26,147 +76,183 @@ def startup() -> None:
     db.init()
 
 
+# --- справочники -----------------------------------------------------------------------
+
 @app.get("/api/health")
 def health() -> dict:
-    conn = db.connect()
-    objectives = conn.execute("SELECT COUNT(*) AS n FROM objective").fetchone()["n"]
-    conn.close()
-    return {
-        "ok": True,
-        "db": "ok" if objectives else "empty",
-        "llm": "demo" if os.getenv("DEMO_MODE") == "1" else "live",
-        "version": app.version,
-    }
+    with _tx() as conn:
+        n = conn.execute("SELECT COUNT(*) AS n FROM task").fetchone()["n"]
+    return {"ok": True, "db": "ok" if n else "empty", "llm": llm.mode(), "version": app.version}
 
 
-@app.get("/api/classes")
-def classes() -> list[dict]:
-    conn = db.connect()
-    rows = conn.execute(
-        """SELECT k.id, k.name, k.subject, k.grade, k.language,
-                  (SELECT COUNT(*) FROM student s WHERE s.klass_id = k.id) AS students
-           FROM klass k"""
-    ).fetchall()
-    conn.close()
-    return [dict(row) for row in rows]
+@app.get("/api/meta")
+def meta() -> dict:
+    return tasks.meta()
 
 
-@app.get("/api/classes/{class_id}/plan")
-def plan(class_id: int) -> dict:
-    conn = db.connect()
-    klass = conn.execute("SELECT * FROM klass WHERE id = ?", (class_id,)).fetchone()
-    if klass is None:
-        conn.close()
-        raise HTTPException(404, "class not found")
-    lessons = conn.execute(
-        """SELECT l.id, l.date, l.topic, l.objective_codes, l.status,
-                  (SELECT COUNT(*) FROM lesson_pack p WHERE p.lesson_id = l.id) AS packs
-           FROM lesson l WHERE l.klass_id = ? ORDER BY l.date""",
-        (class_id,),
-    ).fetchall()
-    conn.close()
-    return {
-        "class": {"id": klass["id"], "name": klass["name"], "subject": klass["subject"]},
-        "quarter": 1,
-        "lessons": [
-            {
-                "id": row["id"],
-                "date": row["date"],
-                "topic": row["topic"],
-                "objectives": json.loads(row["objective_codes"]),
-                "status": row["status"],
-                "has_pack": bool(row["packs"]),
-            }
-            for row in lessons
-        ],
-    }
+@app.get("/api/businesses")
+def businesses() -> list[dict]:
+    with _tx() as conn:
+        return [dict(r) for r in conn.execute("SELECT id, name, industry FROM business ORDER BY id")]
 
 
-# --- ниже: заглушки под контракт, реализуются в ходе хакатона -------------------------
-
-@app.post("/api/classes/{class_id}/plan/build")
-def build_plan(class_id: int) -> dict:
-    """planner.build(class_id) → создаёт lesson на четверть. См. docs/06-pipelines.md §2."""
-    raise HTTPException(501, "planner not implemented yet")
-
-
-@app.get("/api/lessons/{lesson_id}")
-def lesson(lesson_id: int) -> dict:
-    raise HTTPException(501, "not implemented yet")
-
-
-@app.post("/api/lessons/{lesson_id}/pack")
-def lesson_pack(lesson_id: int, force: bool = False) -> dict:
-    """generate.lesson_pack(...) → КСП, объяснение, задания, шаблоны ДЗ. docs/05-llm.md §1."""
-    raise HTTPException(501, "not implemented yet")
+@app.get("/api/teams")
+def teams() -> list[dict]:
+    with _tx() as conn:
+        rows = conn.execute("SELECT * FROM team ORDER BY id").fetchall()
+    return [
+        {"id": r["id"], "name": r["name"], "interests": json.loads(r["interests"]),
+         "skills": json.loads(r["skills"]), "technologies": json.loads(r["technologies"]),
+         "points": r["points"]}
+        for r in rows
+    ]
 
 
-@app.post("/api/lessons/{lesson_id}/homework")
-def build_homework(lesson_id: int) -> dict:
-    """60% цели урока + 40% просевшие цели, seed на ученика. docs/06-pipelines.md §3."""
-    raise HTTPException(501, "not implemented yet")
+# --- задача: черновик → вопросы → карточка → рейтинг → публикация -------------------------
 
-
-@app.get("/api/students/{student_id}/homework")
-def student_homework(student_id: int, lesson_id: int) -> dict:
-    raise HTTPException(501, "not implemented yet")
+class TaskIn(BaseModel):
+    business_id: int
+    draft_text: str
+    industry: str = ""
 
 
 class AnswerIn(BaseModel):
-    item_id: int
-    answer: str
-    telemetry: dict = {}
+    question_id: int
+    answer: str = ""
 
 
-class SubmissionIn(BaseModel):
-    student_id: int
-    lesson_id: int
-    channel: str = "web"
+class AnswersIn(BaseModel):
     answers: list[AnswerIn]
 
 
-@app.post("/api/submissions")
-def submit(payload: SubmissionIn) -> dict:
-    """grade.check(...) → sympy, дескрипторы, mastery, детектор. docs/06-pipelines.md §4–5."""
-    raise HTTPException(501, "not implemented yet")
+class CardIn(BaseModel):
+    card: dict[str, str]
 
 
-@app.post("/api/submissions/photo")
-async def submit_photo(
-    file: UploadFile = File(...),
-    student_id: int = Form(...),
-    lesson_id: int = Form(...),
-    channel: str = Form("phone"),
-) -> dict:
-    raise HTTPException(501, "not implemented yet")
+@app.post("/api/tasks", status_code=201)
+def create_task(payload: TaskIn) -> dict:
+    with _tx() as conn:
+        return tasks.create(conn, payload.business_id, payload.draft_text, payload.industry)
 
 
-@app.get("/api/students/{student_id}/mastery")
-def student_mastery(student_id: int) -> dict:
-    raise HTTPException(501, "not implemented yet")
+@app.get("/api/tasks")
+def list_tasks(business_id: int) -> list[dict]:
+    with _tx() as conn:
+        return tasks.for_business(conn, business_id)
 
 
-@app.get("/api/classes/{class_id}/mastery")
-def class_mastery(class_id: int) -> dict:
-    raise HTTPException(501, "not implemented yet")
+@app.get("/api/tasks/{task_id}")
+def get_task(task_id: int) -> dict:
+    with _tx() as conn:
+        return tasks.get(conn, task_id)
 
 
-@app.get("/api/teacher/review-queue")
-def review_queue(class_id: int) -> list[dict]:
-    raise HTTPException(501, "not implemented yet")
+@app.post("/api/tasks/{task_id}/answers")
+def answer_questions(task_id: int, payload: AnswersIn) -> dict:
+    with _tx() as conn:
+        return tasks.answer(conn, task_id, [a.model_dump() for a in payload.answers])
 
 
-@app.get("/api/print/homework/{lesson_id}", response_class=HTMLResponse)
-def print_homework(lesson_id: int) -> str:
-    """HTML для печати: лист на ученика, QR в углу, разрыв страницы. MVP-2."""
-    raise HTTPException(501, "not implemented yet")
+@app.put("/api/tasks/{task_id}/card")
+def edit_card(task_id: int, payload: CardIn) -> dict:
+    with _tx() as conn:
+        return tasks.edit(conn, task_id, payload.card)
 
 
-# --- статика фронта (один сервис = одна публичная ссылка) ------------------------------
+@app.post("/api/tasks/{task_id}/confirm")
+def confirm_task(task_id: int) -> dict:
+    with _tx() as conn:
+        return tasks.confirm(conn, task_id)
+
+
+@app.post("/api/tasks/{task_id}/publish")
+def publish_task(task_id: int) -> dict:
+    with _tx() as conn:
+        return tasks.publish(conn, task_id)
+
+
+@app.post("/api/rating/preview")
+def rating_preview(payload: CardIn) -> dict:
+    return rating.score(payload.card)
+
+
+# --- каталог, отклики, выбор бизнеса ----------------------------------------------------
+
+@app.get("/api/catalog")
+def catalog_listing(industry: str | None = None, level: str | None = None) -> list[dict]:
+    with _tx() as conn:
+        return catalog.listing(conn, industry, level)
+
+
+@app.get("/api/teams/{team_id}/recommendations")
+def recommendations(team_id: int) -> list[dict]:
+    with _tx() as conn:
+        return catalog.recommend(conn, team_id)
+
+
+class ProposalIn(BaseModel):
+    team_id: int
+    idea: str
+    plan: str
+    timeline: str
+    link: str
+
+
+class DecisionIn(BaseModel):
+    decision: str
+    comment: str = ""
+
+
+class MilestoneIn(BaseModel):
+    title: str
+
+
+@app.post("/api/tasks/{task_id}/proposals", status_code=201)
+def create_proposal(task_id: int, payload: ProposalIn) -> dict:
+    with _tx() as conn:
+        return proposals.create(conn, task_id, payload.team_id, payload.idea, payload.plan,
+                                payload.timeline, payload.link)
+
+
+@app.get("/api/tasks/{task_id}/proposals")
+def task_proposals(task_id: int) -> list[dict]:
+    with _tx() as conn:
+        return proposals.for_task(conn, task_id)
+
+
+@app.get("/api/teams/{team_id}/proposals")
+def team_proposals(team_id: int) -> list[dict]:
+    with _tx() as conn:
+        return proposals.for_team(conn, team_id)
+
+
+@app.post("/api/proposals/{proposal_id}/decision")
+def decide_proposal(proposal_id: int, payload: DecisionIn) -> dict:
+    with _tx() as conn:
+        return proposals.decide(conn, proposal_id, payload.decision, payload.comment)
+
+
+@app.post("/api/proposals/{proposal_id}/milestones")
+def add_milestone(proposal_id: int, payload: MilestoneIn) -> dict:
+    with _tx() as conn:
+        return proposals.add_milestone(conn, proposal_id, payload.title)
+
+
+# --- ИИ: промпты, формат входа и выхода, обработка некорректного ответа (ТЗ §5) ------------
+
+@app.get("/api/ai/spec")
+def ai_spec() -> dict:
+    return ai.spec()
+
+
+# --- статика фронта (один сервис = одна ссылка) -----------------------------------------
 
 if WEB_DIST.exists():
     app.mount("/assets", StaticFiles(directory=WEB_DIST / "assets"), name="assets")
 
     @app.get("/{full_path:path}")
     def spa(full_path: str) -> FileResponse:
-        return FileResponse(WEB_DIST / "index.html")
+        if full_path.startswith("api/"):
+            raise StarletteHTTPException(404, "Not Found")
+        file = WEB_DIST / full_path
+        return FileResponse(file if full_path and file.is_file() else WEB_DIST / "index.html")

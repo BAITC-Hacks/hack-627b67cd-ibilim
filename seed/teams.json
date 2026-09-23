@@ -1,0 +1,7 @@
+[
+  {"id": 1, "name": "DataCats", "interests": ["агро", "полив"], "skills": ["python", "аналитика"], "technologies": ["FastAPI", "pandas"]},
+  {"id": 2, "name": "Retail Pulse", "interests": ["ритейл", "продажи"], "skills": ["аналитика", "дизайн"], "technologies": ["React", "SQL"]},
+  {"id": 3, "name": "RouteLab", "interests": ["логистика", "маршруты"], "skills": ["оптимизация", "python"], "technologies": ["FastAPI", "PostgreSQL"]},
+  {"id": 4, "name": "EduVector", "interests": ["образование", "обучение"], "skills": ["аналитика", "интерфейсы"], "technologies": ["React", "Python"]},
+  {"id": 5, "name": "FinCraft", "interests": ["финансы", "платежи"], "skills": ["безопасность", "аналитика"], "technologies": ["SQL", "Python"]}
+]

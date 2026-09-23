@@ -1,0 +1,7 @@
+[
+  {"id": 1, "name": "ТОО «Агро Север»", "industry": "Агро", "contact": "agro@example.kz"},
+  {"id": 2, "name": "ТОО «Городской Маркет»", "industry": "Ритейл", "contact": "market@example.kz"},
+  {"id": 3, "name": "ТОО «Путь Логистик»", "industry": "Логистика", "contact": "logistics@example.kz"},
+  {"id": 4, "name": "Учебный центр «Орбита»", "industry": "Образование", "contact": "orbit@example.kz"},
+  {"id": 5, "name": "ТОО «ФинПоток»", "industry": "Финансы", "contact": "finflow@example.kz"}
+]
