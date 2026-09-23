@@ -54,6 +54,7 @@ def test_mandatory_demo_end_to_end(client):
     scores = [h["score"] for h in task["history"]]
     assert scores == sorted(scores) and scores[-1] > scores[0]
     assert task["rating"]["score"] >= 70
+    assert task["position"] == {"place": 1, "of": 6, "projected": True}  # «опубликуйте — будете первой»
 
     # 4. без подтверждения не публикуется, после — публикуется
     assert client.post(f"/api/tasks/{task['id']}/publish").status_code == 409
@@ -61,6 +62,7 @@ def test_mandatory_demo_end_to_end(client):
     assert task["official"]["score"] == task["rating"]["score"]
     task = client.post(f"/api/tasks/{task['id']}/publish").json()
     assert task["status"] == "published"
+    assert task["position"] == {"place": 1, "of": 6, "projected": False}
 
     # 5. в каталоге на своём месте по рейтингу, команде рекомендуется
     catalog = client.get("/api/catalog").json()

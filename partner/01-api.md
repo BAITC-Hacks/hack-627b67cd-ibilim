@@ -87,6 +87,7 @@
   "rating": { "score": 38, "level": "draft", "level_label": "черновик", "breakdown": [], "missing": [], "next_best": [] },
   "confirmed": false,
   "official": null,
+  "position": { "place": 3, "of": 6, "projected": true },
   "history": [
     { "at": "2026-09-23T13:40:00Z", "event": "draft", "score": 12, "level": "draft", "confirmed": false },
     { "at": "2026-09-23T13:42:10Z", "event": "answers", "score": 38, "level": "draft", "confirmed": false }
@@ -103,6 +104,9 @@
   отбрасывается и пишется в `ai.warnings` — так ИИ не добавляет фактов от себя (ТЗ §5).
 - `rating` — рейтинг **текущей** карточки (предпросмотр); `official` — `{ "score", "level" }`
   последней **подтверждённой** версии или `null`. Каталог сортирует по `official`.
+- `position` — место в каталоге: у опубликованной задачи — по `official`; у неопубликованной
+  `projected: true` — куда она встанет по текущему `rating`, если её подтвердить и опубликовать
+  («опубликуйте — будете 3-й из 6»). Это и есть «рейтинг влияет на позицию» из ТЗ §9.
 - `history.event`: `draft | answers | edit | confirm` — лента роста рейтинга для демо.
 - `ai.mode`: `llm` или `stub` — API недоступен или ответ модели не прошёл проверку, сработала
   локальная заглушка. `attempts` — сколько раз спрашивали модель.
@@ -120,11 +124,13 @@
   "next_best": [
     { "key": "data", "label": "Данные и материалы", "gain": 20,
       "hint": "укажите, какие данные есть: выгрузки, примеры, API" }
-  ]
+  ],
+  "next_level": { "key": "ready", "label": "готовая", "points_needed": 22 }
 }
 ```
 `breakdown` — все 7 показателей по порядку `meta.indicators`; `hint` пустой, если балл максимальный.
 `missing` — ключи показателей с 0 баллов. `next_best` — что даст больше всего баллов, по убыванию `gain`.
+`next_level` — сколько баллов не хватает до следующего уровня; `null` на `priority`.
 
 ### POST /api/tasks
 ```json
@@ -198,12 +204,14 @@
 
 Объект **Proposal**:
 ```json
-{ "id": 12, "task_id": 7, "team": { "id": 2, "name": "DataCats" },
+{ "id": 12, "task_id": 7,
+  "team": { "id": 2, "name": "DataCats", "skills": ["python", "ml"], "technologies": ["FastAPI", "pandas"] },
   "idea": "Модель влажности почвы по данным датчиков и погоде", "plan": "1) EDA 2) модель 3) дашборд",
   "timeline": "2 недели", "link": "https://github.com/datacats/irrigation",
   "status": "submitted", "comment": "", "created_at": "2026-09-23T14:05:00Z", "decided_at": null }
 ```
-`status`: `submitted | accepted | rejected`.
+`status`: `submitted | accepted | rejected`. `team.skills` и `team.technologies` — чтобы бизнес
+сравнивал отклики не только по тексту.
 
 ### POST /api/tasks/{id}/proposals
 ```json

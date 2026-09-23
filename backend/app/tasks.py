@@ -7,7 +7,7 @@
 import json
 import sqlite3
 
-from . import ai, db, rating
+from . import ai, catalog, db, rating
 from .errors import BadRequest, Conflict, NotFound
 
 INDUSTRIES = ["Агро", "Ритейл", "Логистика", "Образование", "Финансы", "Производство", "IT", "Госсектор"]
@@ -72,6 +72,11 @@ def _out(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
         (row["id"],),
     ).fetchall()
     proposals = conn.execute("SELECT COUNT(*) AS n FROM proposal WHERE task_id = ?", (row["id"],)).fetchone()["n"]
+    preview = rating.score(card)
+    # опубликованная стоит по официальному баллу, неопубликованная — прогноз по текущему
+    published = row["status"] == "published" and row["score"] is not None
+    position = {**catalog.place(conn, row["score"] if published else preview["score"], row["id"]),
+                "projected": not published}
     return {
         "id": row["id"],
         "status": row["status"],
@@ -81,9 +86,10 @@ def _out(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
         "card": card,
         "sources": json.loads(row["sources"]),
         "questions": [dict(q) for q in questions],
-        "rating": rating.score(card),
+        "rating": preview,
         "confirmed": bool(row["confirmed"]),
         "official": {"score": row["score"], "level": row["level"]} if row["score"] is not None else None,
+        "position": position,
         "history": [
             {"at": _iso(h["created_at"]), "event": h["event"], "score": h["score"],
              "level": h["level"], "confirmed": bool(h["confirmed"])}

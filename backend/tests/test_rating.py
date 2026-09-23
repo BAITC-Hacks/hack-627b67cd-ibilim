@@ -30,7 +30,22 @@ def test_full_card_is_100_and_has_no_hints():
     assert result["score"] == 100
     assert result["level"] == "priority"
     assert result["missing"] == result["next_best"] == []
+    assert result["next_level"] is None
     assert all(row["points"] == row["max"] and not row["hint"] for row in result["breakdown"])
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected"),
+    [
+        ((), {"key": "working", "label": "рабочая", "points_needed": 40}),
+        (("context", "need", "data"), {"key": "ready", "label": "готовая", "points_needed": 30}),
+        (("context", "need", "data", "expected_result", "success_criteria"),
+         {"key": "priority", "label": "приоритетная", "points_needed": 20}),
+    ],
+)
+def test_next_level_uses_next_threshold(fields, expected):
+    result = rating.score({field: FULL[field] for field in fields})
+    assert result["next_level"] == expected
 
 
 def test_partial_points_and_gain_order():

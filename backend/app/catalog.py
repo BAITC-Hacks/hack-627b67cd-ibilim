@@ -23,6 +23,20 @@ def _summary(card: dict) -> str:
     return value if len(value) <= 160 else value[:159].rstrip() + "…"
 
 
+def place(conn: sqlite3.Connection, score: int, task_id: int | None = None) -> dict:
+    """Место задачи или прогноз для черновика среди опубликованных задач.
+
+    Исключаем task_id из сравнения, чтобы опубликованная задача не считала себя дважды.
+    Равный балл не увеличивает место; сортировка каталога разрешает ничью по времени.
+    """
+    row = conn.execute(
+        "SELECT COUNT(*) AS others, COUNT(CASE WHEN score > ? THEN 1 END) AS ahead "
+        "FROM task WHERE status = 'published' AND (? IS NULL OR id != ?)",
+        (score, task_id, task_id),
+    ).fetchone()
+    return {"place": row["ahead"] + 1, "of": row["others"] + 1}
+
+
 def listing(conn: sqlite3.Connection, industry: str | None = None, level: str | None = None) -> list[dict]:
     """GET /api/catalog. Все задачи со status = published — низкий рейтинг не скрывает задачу.
 

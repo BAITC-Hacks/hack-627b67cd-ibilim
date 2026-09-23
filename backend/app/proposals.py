@@ -4,6 +4,7 @@
 Функции не делают commit: транзакцию закрывает роут в main.py.
 """
 
+import json
 import sqlite3
 from urllib.parse import urlsplit
 
@@ -13,7 +14,11 @@ from . import errors
 def _proposal(row: sqlite3.Row) -> dict:
     return {
         "id": row["id"], "task_id": row["task_id"],
-        "team": {"id": row["team_id"], "name": row["team_name"]},
+        "team": {
+            "id": row["team_id"], "name": row["team_name"],
+            "skills": json.loads(row["team_skills"] or "[]"),
+            "technologies": json.loads(row["team_technologies"] or "[]"),
+        },
         "idea": row["idea"], "plan": row["plan"], "timeline": row["timeline"],
         "link": row["link"], "status": row["status"], "comment": row["comment"],
         "created_at": row["created_at"].replace(" ", "T") + "Z",
@@ -23,7 +28,8 @@ def _proposal(row: sqlite3.Row) -> dict:
 
 def _get(conn: sqlite3.Connection, proposal_id: int) -> dict:
     row = conn.execute(
-        "SELECT p.*, t.name AS team_name FROM proposal AS p "
+        "SELECT p.*, t.name AS team_name, t.skills AS team_skills, "
+        "t.technologies AS team_technologies FROM proposal AS p "
         "JOIN team AS t ON t.id = p.team_id WHERE p.id = ?",
         (proposal_id,),
     ).fetchone()
@@ -64,7 +70,8 @@ def for_task(conn: sqlite3.Connection, task_id: int) -> list[dict]:
     if conn.execute("SELECT 1 FROM task WHERE id = ?", (task_id,)).fetchone() is None:
         raise errors.NotFound("Задача не найдена")
     rows = conn.execute(
-        "SELECT p.*, t.name AS team_name FROM proposal AS p "
+        "SELECT p.*, t.name AS team_name, t.skills AS team_skills, "
+        "t.technologies AS team_technologies FROM proposal AS p "
         "JOIN team AS t ON t.id = p.team_id WHERE p.task_id = ? "
         "ORDER BY p.created_at, p.id",
         (task_id,),
@@ -77,7 +84,8 @@ def for_team(conn: sqlite3.Connection, team_id: int) -> list[dict]:
     if conn.execute("SELECT 1 FROM team WHERE id = ?", (team_id,)).fetchone() is None:
         raise errors.NotFound("Команда не найдена")
     rows = conn.execute(
-        "SELECT p.*, t.name AS team_name FROM proposal AS p "
+        "SELECT p.*, t.name AS team_name, t.skills AS team_skills, "
+        "t.technologies AS team_technologies FROM proposal AS p "
         "JOIN team AS t ON t.id = p.team_id WHERE p.team_id = ? "
         "ORDER BY p.created_at DESC, p.id DESC",
         (team_id,),

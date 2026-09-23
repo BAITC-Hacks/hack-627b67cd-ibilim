@@ -143,7 +143,13 @@ def score(card: dict) -> dict:
             next_best.append({"key": key, "label": label, "gain": maximum - points, "hint": hint})
     next_best.sort(key=lambda item: -item["gain"])
     key, label = level(total)
+    next_level = next(
+        ({"key": next_key, "label": next_label, "points_needed": minimum - total}
+         for minimum, next_key, next_label in reversed(LEVELS) if minimum > total),
+        None,
+    )
     return {
         "score": total, "level": key, "level_label": label,
         "breakdown": breakdown, "missing": missing, "next_best": next_best,
+        "next_level": next_level,
     }

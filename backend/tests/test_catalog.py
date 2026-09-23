@@ -36,6 +36,22 @@ def test_listing_tie_newer_first_and_unpublished_hidden(conn):
     assert 2 not in [item["id"] for item in catalog.listing(conn)]
 
 
+def test_place_for_published_task_excludes_self(conn):
+    assert catalog.place(conn, 94, task_id=4) == {"place": 1, "of": 5}
+    assert catalog.place(conn, 80, task_id=3) == {"place": 3, "of": 5}
+    assert catalog.place(conn, 0, task_id=4) == {"place": 5, "of": 5}
+
+
+def test_place_for_draft_includes_all_published_and_ties(conn):
+    assert catalog.place(conn, 80) == {"place": 3, "of": 6}
+    assert catalog.place(conn, 87) == {"place": 2, "of": 6}
+    assert catalog.place(conn, 100) == {"place": 1, "of": 6}
+    conn.execute("UPDATE task SET status = 'card' WHERE id = 4")
+    assert catalog.place(conn, 99, task_id=4) == {"place": 1, "of": 5}
+    conn.execute("UPDATE task SET status = 'card' WHERE status = 'published'")
+    assert catalog.place(conn, 20) == {"place": 1, "of": 1}
+
+
 def test_recommend_matches_words_and_excludes_draft(conn):
     # The agricultural task is a published draft; it stays in the catalog.
     assert catalog.recommend(conn, 1)[0]["task_id"] == 5  # аналитика ↔ Аналитики
