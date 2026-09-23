@@ -57,3 +57,41 @@
 .rating-penalties span{color:#ad5d37;font-weight:850}
 .rating-penalties small{grid-column:1/3;color:#8d6f5d;line-height:1.4}
 @media(max-width:650px){.privacy-notice{padding:17px}.privacy-notice li{grid-template-columns:1fr;gap:3px}.audience-card li{flex-direction:column}.audience-card li span{text-align:left}}
+
+/* Card review: show the rating outcome and a student's concrete questions. */
+.rating-next .forecast-note{font-size:.76rem;line-height:1.45;color:#71847b;margin:0 0 12px}
+.rating-next .rating-outcome{grid-column:1/3;margin:5px 0 0;padding-top:8px;border-top:1px solid #e2e9e2;color:#537461;font-size:.74rem;line-height:1.5}
+.rating-outcome b{color:#244f43}
+.position-card p{font-size:.73rem;color:#647e6f;margin:8px 0 0}
+.student-check{padding:25px 29px;margin-top:34px}
+.student-check h2{font-size:1.55rem;margin:9px 0}
+.student-check>p{font-size:.85rem;line-height:1.55;color:#738780;max-width:62ch}
+.student-check .secondary-button{margin-top:9px}
+.student-check .student-check-help{font-size:.76rem;color:#8a785e;margin:11px 0 0}
+.student-check-result{border-top:1px solid #e5ebe7;margin-top:22px;padding-top:20px}
+.student-check-result>strong{display:inline-block;border-radius:6px;padding:7px 10px;font-size:.8rem}
+.student-check-result>.check-ready{color:#357152;background:#e1f1e6}
+.student-check-result>.check-needs-work{color:#8e6436;background:#fff0d9}
+.student-check-result h3{font-size:.95rem;margin:22px 0 9px}
+.student-check-result ol,.student-check-warnings{margin:0;padding-left:20px;color:#536d60;font-size:.83rem;line-height:1.6}
+.student-assumptions{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.student-assumptions li{border:1px solid #e2e9e2;border-radius:9px;padding:14px 16px;background:#f9faf7}
+.student-assumptions p{font-size:.8rem;margin:7px 0;color:#6d8275}
+.student-assumptions strong{font-size:.83rem;color:#284d43}
+.student-assumptions button{display:block;border:0;background:none;color:#99632f;font-size:.77rem;font-weight:800;padding:8px 0 0}
+.student-assumptions button:hover{text-decoration:underline}
+.rating-roadmap{margin-top:19px;padding:0 10px}
+.rating-roadmap-track{height:10px;border-radius:10px;background:#e9eee9;overflow:hidden}
+.rating-roadmap-track>span{display:block;height:100%;background:#aa7039;border-radius:10px}
+.rating-roadmap-labels{height:39px;position:relative;font-size:.69rem;color:#6e8578}
+.rating-roadmap-labels>span{position:absolute;top:5px;transform:translateX(-50%);display:flex;align-items:center;flex-direction:column;font-weight:850}
+.rating-roadmap-labels small{font-size:.61rem;font-weight:600;white-space:nowrap}
+.rating-opportunity{margin-top:18px;padding:15px 17px;border:1px solid #e5d3b8;background:#fff8ed;border-radius:9px}
+.rating-opportunity>strong{display:flex;justify-content:space-between;gap:8px;margin:9px 0 6px;font-size:.93rem}
+.rating-opportunity>strong span{color:#a36b30;white-space:nowrap}
+.rating-opportunity p{font-size:.75rem;line-height:1.5;color:#7a6b56;margin:0}
+.rating-opportunity .rating-opportunity-outcome{border-top:1px solid #eadbc6;padding-top:9px;margin-top:10px;color:#5a795f}
+.indicator-state{font-size:.68rem!important;font-weight:850;color:#9a7145!important;margin:3px 0}
+.indicator-complete{color:#4f8463!important}
+.rank-gain{border:1px solid #c7e3cf;border-radius:9px;background:#e5f4e9;color:#367553;font-size:.87rem;font-weight:800;padding:14px 18px;margin-top:14px}
+@media(max-width:650px){.student-check{padding:21px}}

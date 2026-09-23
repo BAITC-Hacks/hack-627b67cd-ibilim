@@ -49,6 +49,7 @@ export const submitAnswers = (id, answers) => request(`/tasks/${id}/answers`, 'P
 export const updateCard = (id, card) => request(`/tasks/${id}/card`, 'PUT', { card })
 export const confirmCard = (id) => request(`/tasks/${id}/confirm`, 'POST')
 export const publishTask = (id) => request(`/tasks/${id}/publish`, 'POST')
+export const checkTaskAsStudent = (id) => request(`/tasks/${id}/student-check`, 'POST')
 export const previewRating = (card) => request('/rating/preview', 'POST', { card })
 
 export const getCatalog = ({ industry, level } = {}) => request(`/catalog${query({ industry, level })}`)
@@ -64,3 +65,4 @@ export const addMilestone = (proposalId, title) =>
   request(`/proposals/${proposalId}/milestones`, 'POST', { title })
 
 export const getAiSpec = () => request('/ai/spec')
+export const getStats = () => request('/stats')

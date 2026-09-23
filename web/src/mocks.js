@@ -243,6 +243,22 @@ function publishTask(id) {
   return presentTask(task)
 }
 
+function studentCheck(id) {
+  const task = taskById(id)
+  const gaps = [...meta.indicators.flatMap((item) => item.fields), 'title']
+    .filter((key) => !String(task.card[key] || '').trim()).slice(0, 6)
+  return {
+    can_start: gaps.length === 0,
+    first_week: [],
+    assumptions: gaps.map((field) => ({
+      field,
+      assumption: `Сведения в поле «${meta.fields.find((item) => item.key === field)?.label}» пока не указаны`,
+      question: `Что команде нужно знать про «${meta.fields.find((item) => item.key === field)?.label}» до начала работы?`,
+    })),
+    ai: { mode: 'stub', attempts: 0, warnings: [] },
+  }
+}
+
 function catalog(industry, level) {
   return state.tasks.filter((task) => task.status === 'published')
     .filter((task) => !industry || task.industry === industry)
@@ -321,6 +337,33 @@ function aiSpec() {
   }
 }
 
+function stats() {
+  const ratings = state.tasks.map((task) => rate(task.card))
+  const average = (values) => values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length * 10) / 10 : 0
+  const decided = state.proposals.filter((proposal) => proposal.decided_at)
+  return {
+    tasks: {
+      total: state.tasks.length,
+      published: state.tasks.filter((task) => task.status === 'published').length,
+      avg_score: average(ratings.map((rating) => rating.score)),
+      avg_growth: average(state.tasks.map((task, index) => ratings[index].score - (task.history[0]?.score || 0))),
+      by_level: meta.levels.map((level) => ({ key: level.key, label: level.label, count: ratings.filter((rating) => rating.level === level.key).length })),
+    },
+    industries: meta.industries.map((industry) => {
+      const tasks = state.tasks.filter((task) => task.industry === industry)
+      return { industry, tasks: tasks.length, avg_score: average(tasks.map((task) => rate(task.card).score)), proposals: state.proposals.filter((proposal) => tasks.some((task) => task.id === proposal.task_id)).length }
+    }),
+    proposals: {
+      total: state.proposals.length,
+      accepted: state.proposals.filter((proposal) => proposal.status === 'accepted').length,
+      rejected: state.proposals.filter((proposal) => proposal.status === 'rejected').length,
+      pending: state.proposals.filter((proposal) => proposal.status === 'submitted').length,
+      avg_hours_to_decision: average(decided.map((proposal) => (new Date(proposal.decided_at) - new Date(proposal.created_at)) / 3600000)),
+    },
+    teams: state.teams.map((team) => ({ id: team.id, name: team.name, points: team.points, proposals: state.proposals.filter((proposal) => proposal.team.id === team.id).length, accepted: state.proposals.filter((proposal) => proposal.team.id === team.id && proposal.status === 'accepted').length, skills: team.skills })),
+  }
+}
+
 export async function mockRequest(method, path, body) {
   if (method === 'POST') await new Promise((resolve) => setTimeout(resolve, 600))
   const url = new URL(path, 'http://mock.local')
@@ -339,6 +382,7 @@ export async function mockRequest(method, path, body) {
   if ((match = route.match(/^\/tasks\/(\d+)\/card$/)) && method === 'PUT') return updateCard(match[1], body)
   if ((match = route.match(/^\/tasks\/(\d+)\/confirm$/)) && method === 'POST') return confirmTask(match[1])
   if ((match = route.match(/^\/tasks\/(\d+)\/publish$/)) && method === 'POST') return publishTask(match[1])
+  if ((match = route.match(/^\/tasks\/(\d+)\/student-check$/)) && method === 'POST') return studentCheck(match[1])
   if (method === 'POST' && route === '/rating/preview') return rate(body.card)
   if (method === 'GET' && route === '/catalog') return copy(catalog(url.searchParams.get('industry'), url.searchParams.get('level')))
   if ((match = route.match(/^\/teams\/(\d+)\/recommendations$/)) && method === 'GET') return copy(recommendations(match[1]))
@@ -350,5 +394,6 @@ export async function mockRequest(method, path, body) {
   if ((match = route.match(/^\/proposals\/(\d+)\/decision$/)) && method === 'POST') return decideProposal(match[1], body)
   if ((match = route.match(/^\/proposals\/(\d+)\/milestones$/)) && method === 'POST') return milestone(match[1])
   if (method === 'GET' && route === '/ai/spec') return aiSpec()
+  if (method === 'GET' && route === '/stats') return stats()
   throw error(404, 'Маршрут не найден')
 }
