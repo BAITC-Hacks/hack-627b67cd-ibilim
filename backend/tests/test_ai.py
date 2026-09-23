@@ -61,6 +61,6 @@ def test_build_card_keeps_manual_fields_and_unplaced_answers(monkeypatch):
 
 def test_spec_shows_prompts_and_schemas():
     spec = ai.spec()
-    assert [c["name"] for c in spec["calls"]] == ["analyze_draft", "build_card"]
+    assert [c["name"] for c in spec["calls"]] == ["analyze_draft", "build_card", "student_check"]
     assert all(c["system"] and c["output_schema"] for c in spec["calls"])
     assert spec["invalid_response"]

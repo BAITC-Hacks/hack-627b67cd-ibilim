@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import ai, catalog, db, llm, proposals, rating, tasks
+from . import ai, catalog, db, llm, proposals, rating, stats, tasks
 from .errors import BadRequest, Conflict, NotFound
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -170,6 +170,19 @@ def confirm_task(task_id: int) -> dict:
 def publish_task(task_id: int) -> dict:
     with _tx() as conn:
         return tasks.publish(conn, task_id)
+
+
+@app.post("/api/tasks/{task_id}/student-check")
+def student_check(task_id: int) -> dict:
+    with _tx() as conn:
+        card = tasks.get(conn, task_id)["card"]
+    return ai.student_check(card)  # вызов модели — вне транзакции
+
+
+@app.get("/api/stats")
+def program_stats() -> dict:
+    with _tx() as conn:
+        return stats.overview(conn)
 
 
 @app.post("/api/rating/preview")

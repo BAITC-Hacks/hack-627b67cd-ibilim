@@ -255,6 +255,64 @@ def build_card(draft_text: str, qa: list[dict], card: dict, sources: dict) -> di
     return {"card": merged, "sources": merged_sources, "ai": meta}
 
 
+# --- ИИ-студент: проверка карточки глазами команды -------------------------------------------
+
+STUDENT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "can_start": {"type": "boolean"},
+        "first_week": {"type": "array", "items": {"type": "string"}},
+        "assumptions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "field": {"type": "string", "enum": FIELDS},
+                    "assumption": {"type": "string"},
+                    "question": {"type": "string"},
+                },
+                "required": ["field", "assumption", "question"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["can_start", "first_week", "assumptions"],
+    "additionalProperties": False,
+}
+
+STUDENT_SYSTEM = (
+    "Ты — студенческая команда из 3 человек. Тебе дали карточку задачи от бизнеса. Попробуй "
+    "составить план первой недели работы — 3–4 шага, каждый до 10 слов, — опираясь только на карточку. "
+    "Каждый раз, когда для плана тебе пришлось что-то додумать, потому что в карточке этого нет "
+    "или сказано размыто, — запиши допущение: к какому полю оно относится, что ты предположил "
+    "и какой короткий вопрос (до 15 слов) задал бы бизнесу; не больше 4 самых важных допущений. Не придумывай фактов о бизнесе. can_start = true, "
+    "только если можно начать работу без важных допущений. Пиши по-русски, коротко."
+)
+
+
+def student_check(card: dict) -> dict:
+    """Карточка → {"can_start", "first_week", "assumptions", "ai"}: мутные места, а не только пустые."""
+    filled = {f: v for f, v in card.items() if v}
+    try:
+        data, attempts = llm.call_json(
+            "student_check", STUDENT_SYSTEM,
+            json.dumps({"card": filled, "fields": LABELS}, ensure_ascii=False), STUDENT_SCHEMA,
+        )
+        assumptions = [a for a in data["assumptions"] if a.get("field") in FIELDS and a.get("question", "").strip()][:6]
+        return {"can_start": bool(data["can_start"]) and not assumptions,
+                "first_week": [s for s in data["first_week"] if s.strip()][:5],
+                "assumptions": assumptions, "ai": {"mode": "llm", "attempts": attempts, "warnings": []}}
+    except llm.LLMUnavailable as exc:
+        # заглушка: пустые поля — те места, где команде точно придётся гадать
+        assumptions = [
+            {"field": f, "assumption": f"«{LABELS[f]}» не указано — придётся предполагать самим",
+             "question": QUESTION_BANK[f]}
+            for f in _FIELD_ORDER if not card.get(f)
+        ][:6]
+        return {"can_start": not assumptions, "first_week": [], "assumptions": assumptions,
+                "ai": {"mode": "stub", "attempts": exc.attempts, "warnings": [f"ИИ недоступен: {exc}"]}}
+
+
 def spec() -> dict:
     """Промпты, формат входа и выхода, обработка некорректного ответа — то, что ТЗ §5 требует показать."""
     return {
@@ -279,6 +337,14 @@ def spec() -> dict:
                     "fields": LABELS,
                 },
                 "output_schema": CARD_SCHEMA,
+            },
+            {
+                "name": "student_check",
+                "purpose": "ИИ-студент пробует спланировать первую неделю по карточке и отмечает допущения",
+                "system": STUDENT_SYSTEM,
+                "input_example": {"card": {"need": "Понять, какие поля скоро потребуют полива",
+                                           "data": "выгрузка с датчиков"}, "fields": LABELS},
+                "output_schema": STUDENT_SCHEMA,
             },
         ],
         "validation": [
