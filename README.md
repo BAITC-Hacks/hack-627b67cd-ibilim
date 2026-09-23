@@ -2,6 +2,8 @@
 
 **Публичная версия:** [challenge-hub-production.up.railway.app](https://challenge-hub-production.up.railway.app/) · [Исходное ТЗ](https://docs.google.com/document/d/1lFWekP2SirFarATKkWa5neHNL5DlhjZKkUacvGyZk8k/edit)
 
+**Демо-видео (4 мин 47 с):** [от черновика до принятого отклика](demo-artifacts/ai-sana-demo.mp4) · [русские субтитры](demo-artifacts/ai-sana-demo.srt) · [описание записи](<demo-artifacts/О видео.md>)
+
 ## Проблема
 
 Короткое описание бизнес-задачи часто не даёт студенческой команде понять, какие данные доступны, что нужно сделать и по каким критериям принимать результат. **AI Sana Challenge Hub** помогает бизнесу уточнить такую задачу, показывает готовность карточки к работе и открывает её командам. Команда сама предлагает решение, а бизнес выбирает, с кем продолжить работу. Проект создан для кейса AI Sana на HackAlem AI.
