@@ -116,7 +116,6 @@ web/dist
 В терминале, **в корне репо** (там, где лежит `Dockerfile`):
 
 ```bash
-cd ~/hackathon/hack-627b67cd-ibilim
 railway init          # создать проект; имя: challenge-hub
 railway up            # залить код и собрать; ждать 3–5 минут
 railway domain        # выдать публичную ссылку — СКОПИРУЙ ЕЁ
