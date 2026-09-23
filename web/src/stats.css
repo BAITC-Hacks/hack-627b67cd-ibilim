@@ -1,0 +1,44 @@
+.stats-page-heading{display:flex;justify-content:space-between;align-items:end;gap:24px}
+.stats-page-heading h1{margin:15px 0 12px}
+.stats-page-heading .flow-lead{margin-bottom:0}
+.stats-page-heading .secondary-button{flex:none;margin-bottom:5px}
+.stats-overview{display:grid;grid-template-columns:minmax(0,1.7fr) repeat(3,minmax(0,1fr));gap:13px;margin-top:32px}
+.stats-overview>.surface{min-width:0;min-height:176px;padding:22px 23px}
+.stats-growth{background:#e8eeea;border-color:#d7e4da}
+.stats-growth>strong{display:block;font-size:clamp(2.65rem,4vw,4.3rem);line-height:1.1;margin:12px 0 8px;color:#315f4a;letter-spacing:-.06em}
+.stats-growth>strong small{font-size:.98rem;letter-spacing:0;font-weight:650}
+.stats-growth p{font-size:.77rem;color:#5e7869;margin:0;max-width:28ch}
+.stats-summary{display:flex;flex-direction:column;justify-content:space-between;gap:17px}
+.stats-summary>span{font-size:.78rem;line-height:1.4;color:#71867c;font-weight:750}
+.stats-summary>strong{font-size:2.65rem;line-height:1;color:#172c3b}
+.stats-summary>strong small{font-size:.75rem;color:#7c9186;font-weight:600}
+.stats-panels{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.stats-panel{padding:25px 28px;min-width:0}
+.stats-panel h2,.stats-table-panel h2{font-size:1.48rem;margin:8px 0 10px}
+.stats-panel>p{font-size:.8rem;color:#74877c;margin:0}
+.stats-level-list{display:grid;gap:17px;margin-top:22px}
+.stats-level>div{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.83rem}
+.stats-level>div strong{font-size:.88rem}
+.stats-level progress{display:block;width:100%;height:10px;margin-top:6px;accent-color:#aa7039}
+.stats-proposal-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:22px}
+.stats-proposal-grid>div{display:flex;flex-direction:column;gap:7px;background:#f5f7f3;border-radius:8px;padding:14px 16px}
+.stats-proposal-grid span{font-size:.75rem;color:#6e8377}
+.stats-proposal-grid strong{font-size:1.75rem;line-height:1.1}
+.stats-panel .stats-decision-time{border-top:1px solid #e7ece6;margin:17px 0 0;padding-top:15px}
+.stats-decision-time strong{color:#365d4d}
+.stats-table-panel{padding:25px 28px;margin-top:16px;min-width:0}
+.stats-section-heading{display:flex;justify-content:space-between;align-items:end;gap:12px}
+.stats-section-heading>span{font-size:.75rem;color:#7c8e83}
+.stats-table-wrap{overflow-x:auto;margin-top:15px}
+.stats-table-wrap table{border-collapse:collapse;width:100%;min-width:550px;text-align:left}
+.stats-table-wrap thead{background:#f4f6f2}
+.stats-table-wrap th,.stats-table-wrap td{padding:14px 16px;border-bottom:1px solid #e9eee8;font-size:.82rem;vertical-align:top}
+.stats-table-wrap thead th{font-size:.69rem;text-transform:uppercase;letter-spacing:.07em;color:#6f8577;white-space:nowrap}
+.stats-table-wrap tbody th{font-weight:800}
+.stats-table-wrap tbody td{color:#526b60}
+.stats-team-rank{font-size:.73rem;color:#aa7039;margin-right:9px}
+.stats-table-wrap .stats-team-points{font-weight:850;color:#315f4a}
+.stats-empty{font-size:.82rem;color:#74877c;margin:17px 0 0}
+@media(max-width:1000px){.stats-overview{grid-template-columns:repeat(3,minmax(0,1fr))}.stats-growth{grid-column:1/-1}.stats-overview>.surface{min-height:145px}}
+@media(max-width:700px){.stats-page-heading{align-items:start;flex-direction:column}.stats-page-heading .secondary-button{width:100%}.stats-panels{grid-template-columns:1fr}.stats-overview{grid-template-columns:1fr 1fr}.stats-growth{grid-column:1/-1}.stats-overview>.surface{padding:19px;min-height:130px}.stats-summary>strong{font-size:2.15rem}.stats-panel,.stats-table-panel{padding:20px}.stats-section-heading{align-items:start;flex-direction:column;gap:0}}
+@media(max-width:390px){.stats-overview{grid-template-columns:1fr}.stats-growth{grid-column:auto}.stats-overview>.surface{min-height:105px}.stats-proposal-grid{grid-template-columns:1fr 1fr}}

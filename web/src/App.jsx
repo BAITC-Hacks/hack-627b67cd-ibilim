@@ -13,6 +13,7 @@ import Catalog from './screens/Catalog.jsx'
 import ProposalForm from './screens/ProposalForm.jsx'
 import MyProposals from './screens/MyProposals.jsx'
 import AiSpec from './screens/AiSpec.jsx'
+import ProgramStats from './screens/ProgramStats.jsx'
 
 function screen(route, role) {
   switch (route.name) {
@@ -21,6 +22,7 @@ function screen(route, role) {
     case 'catalog': return <Catalog />
     case 'my-proposals': return <MyProposals />
     case 'ai': return <AiSpec />
+    case 'stats': return <ProgramStats />
     case 'task': return role === 'team' ? <ProposalForm id={route.id} /> : <Clarify id={route.id} />
     case 'task-proposals': return <TaskProposals id={route.id} />
     default: return <PagePlaceholder eyebrow="НАВИГАЦИЯ" title="Раздел не найден" description="Выберите раздел в меню, чтобы продолжить." />
@@ -38,6 +40,7 @@ export default function App() {
   const links = identity.role === 'business'
     ? [{ to: '#/new', label: 'Новая задача', name: 'new' }, { to: '#/my-tasks', label: 'Мои задачи', name: 'my-tasks' }]
     : [{ to: '#/catalog', label: 'Каталог', name: 'catalog' }, { to: '#/my-proposals', label: 'Мои отклики', name: 'my-proposals' }]
+  links.push({ to: '#/stats', label: 'Панель программы', name: 'stats' })
   links.push({ to: '#/ai', label: 'Как работает ИИ', name: 'ai' })
 
   return <div className="app-shell">

@@ -4,6 +4,7 @@ import { AppProvider } from './state.js'
 import App from './App.jsx'
 import './styles.css'
 import './flow.css'
+import './stats.css'
 
 createRoot(document.getElementById('root')).render(
   <AppProvider><App /></AppProvider>,

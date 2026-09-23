@@ -6,7 +6,7 @@ export function parseRoute(hash = window.location.hash) {
   if (match) return { name: match[2] === 'proposals' ? 'task-proposals' : 'task', id: Number(match[1]) }
   const routes = {
     '/new': 'new', '/my-tasks': 'my-tasks', '/catalog': 'catalog',
-    '/my-proposals': 'my-proposals', '/ai': 'ai',
+    '/my-proposals': 'my-proposals', '/stats': 'stats', '/ai': 'ai',
   }
   return { name: routes[path] || 'not-found' }
 }

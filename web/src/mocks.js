@@ -338,29 +338,32 @@ function aiSpec() {
 }
 
 function stats() {
-  const ratings = state.tasks.map((task) => rate(task.card))
+  const published = state.tasks.filter((task) => task.status === 'published')
   const average = (values) => values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length * 10) / 10 : 0
+  const averageOrNull = (values) => values.length ? average(values) : null
   const decided = state.proposals.filter((proposal) => proposal.decided_at)
+  const histories = state.tasks.filter((task) => task.history.length > 1)
   return {
     tasks: {
       total: state.tasks.length,
-      published: state.tasks.filter((task) => task.status === 'published').length,
-      avg_score: average(ratings.map((rating) => rating.score)),
-      avg_growth: average(state.tasks.map((task, index) => ratings[index].score - (task.history[0]?.score || 0))),
-      by_level: meta.levels.map((level) => ({ key: level.key, label: level.label, count: ratings.filter((rating) => rating.level === level.key).length })),
+      published: published.length,
+      avg_score: averageOrNull(published.map((task) => task.official?.score || 0)),
+      avg_growth: averageOrNull(histories.map((task) => task.history.at(-1).score - task.history[0].score)),
+      by_level: meta.levels.map((level) => ({ key: level.key, label: level.label, count: published.filter((task) => task.official?.level === level.key).length })),
     },
     industries: meta.industries.map((industry) => {
-      const tasks = state.tasks.filter((task) => task.industry === industry)
-      return { industry, tasks: tasks.length, avg_score: average(tasks.map((task) => rate(task.card).score)), proposals: state.proposals.filter((proposal) => tasks.some((task) => task.id === proposal.task_id)).length }
-    }),
+      const tasks = published.filter((task) => task.industry === industry)
+      return { industry, tasks: tasks.length, avg_score: average(tasks.map((task) => task.official?.score || 0)), proposals: state.proposals.filter((proposal) => tasks.some((task) => task.id === proposal.task_id)).length }
+    }).filter((item) => item.tasks).sort((a, b) => b.tasks - a.tasks || a.industry.localeCompare(b.industry)),
     proposals: {
       total: state.proposals.length,
       accepted: state.proposals.filter((proposal) => proposal.status === 'accepted').length,
       rejected: state.proposals.filter((proposal) => proposal.status === 'rejected').length,
       pending: state.proposals.filter((proposal) => proposal.status === 'submitted').length,
-      avg_hours_to_decision: average(decided.map((proposal) => (new Date(proposal.decided_at) - new Date(proposal.created_at)) / 3600000)),
+      avg_hours_to_decision: averageOrNull(decided.map((proposal) => (new Date(proposal.decided_at) - new Date(proposal.created_at)) / 3600000)),
     },
-    teams: state.teams.map((team) => ({ id: team.id, name: team.name, points: team.points, proposals: state.proposals.filter((proposal) => proposal.team.id === team.id).length, accepted: state.proposals.filter((proposal) => proposal.team.id === team.id && proposal.status === 'accepted').length, skills: team.skills })),
+    teams: state.teams.map((team) => ({ id: team.id, name: team.name, points: team.points, proposals: state.proposals.filter((proposal) => proposal.team.id === team.id).length, accepted: state.proposals.filter((proposal) => proposal.team.id === team.id && proposal.status === 'accepted').length, skills: team.skills }))
+      .sort((a, b) => b.points - a.points || b.accepted - a.accepted || b.proposals - a.proposals || a.id - b.id),
   }
 }
 
