@@ -65,12 +65,14 @@ function rate(card) {
   })
   const score = breakdown.reduce((sum, item) => sum + item.points, 0)
   const level = levelFor(score)
+  const next = meta.levels.find((item) => item.min > score)
   return {
     score, level: level.key, level_label: level.label, breakdown,
     missing: breakdown.filter((item) => item.points === 0).map((item) => item.key),
     next_best: breakdown.filter((item) => item.points < item.max)
       .map((item) => ({ key: item.key, label: item.label, gain: item.max - item.points, hint: item.hint }))
       .sort((a, b) => b.gain - a.gain),
+    next_level: next ? { key: next.key, label: next.label, points_needed: next.min - score } : null,
   }
 }
 
@@ -111,8 +113,8 @@ function freshState() {
       }, 2),
     ],
     proposals: [
-      { id: 1, task_id: 2, team: { id: 2, name: 'Retail Pulse' }, idea: 'Панель продаж по данным касс', plan: '1) очистка данных 2) дизайн 3) пилот', timeline: '4 недели', link: 'https://example.com/retail-pulse', status: 'submitted', comment: '', created_at: now(), decided_at: null },
-      { id: 2, task_id: 3, team: { id: 3, name: 'RouteLab' }, idea: 'Поиск оптимального маршрута', plan: '1) анализ адресов 2) алгоритм 3) проверка', timeline: '6 недель', link: 'https://example.com/route-lab', status: 'submitted', comment: '', created_at: now(), decided_at: null },
+      { id: 1, task_id: 2, team: { id: 2, name: 'Retail Pulse', skills: ['аналитика', 'дизайн'], technologies: ['React', 'SQL'] }, idea: 'Панель продаж по данным касс', plan: '1) очистка данных 2) дизайн 3) пилот', timeline: '4 недели', link: 'https://example.com/retail-pulse', status: 'submitted', comment: '', created_at: now(), decided_at: null },
+      { id: 2, task_id: 3, team: { id: 3, name: 'RouteLab', skills: ['оптимизация', 'python'], technologies: ['FastAPI', 'PostgreSQL'] }, idea: 'Поиск оптимального маршрута', plan: '1) анализ адресов 2) алгоритм 3) проверка', timeline: '6 недель', link: 'https://example.com/route-lab', status: 'submitted', comment: '', created_at: now(), decided_at: null },
     ],
     teams: copy(teams),
   }
@@ -141,7 +143,11 @@ function taskById(id) {
   return task
 }
 function presentTask(task) {
-  return copy({ ...task, proposals: state.proposals.filter((item) => item.task_id === task.id).length })
+  const published = state.tasks.filter((item) => item.status === 'published' && item.id !== task.id)
+  const score = task.status === 'published' ? task.official?.score ?? 0 : task.rating.score
+  const place = 1 + published.filter((item) => (item.official?.score ?? 0) > score || ((item.official?.score ?? 0) === score && String(item.published_at || '') > String(task.published_at || ''))).length
+  const position = { place, of: published.length + 1, projected: task.status !== 'published' }
+  return copy({ ...task, position, proposals: state.proposals.filter((item) => item.task_id === task.id).length })
 }
 function record(task, event) {
   task.rating = rate(task.card)
@@ -260,7 +266,7 @@ function createProposal(id, body) {
   }
   const proposal = {
     id: Math.max(0, ...state.proposals.map((item) => item.id)) + 1,
-    task_id: task.id, team: { id: team.id, name: team.name }, idea: body.idea.trim(),
+    task_id: task.id, team: { id: team.id, name: team.name, skills: team.skills, technologies: team.technologies }, idea: body.idea.trim(),
     plan: body.plan.trim(), timeline: body.timeline.trim(), link: body.link.trim(),
     status: 'submitted', comment: '', created_at: now(), decided_at: null,
   }
