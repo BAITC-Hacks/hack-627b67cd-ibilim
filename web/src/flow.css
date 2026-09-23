@@ -10,3 +10,14 @@
 @media(max-width:850px){.business-proposals{grid-template-columns:1fr}}@media(max-width:650px){.business-task{grid-template-columns:1fr;padding:20px}.business-task-score{flex-direction:row;text-align:left;align-items:center;flex-wrap:wrap}.proposal-compare{padding:20px}}
 .ai-mode{display:flex;gap:50px;flex-wrap:wrap;padding:24px 28px;margin:30px 0}.ai-mode>div{display:flex;flex-direction:column;gap:8px}.ai-mode strong{font-size:1.1rem}.ai-calls{display:grid;gap:15px}.ai-call{padding:27px 29px}.ai-call-heading{display:flex;align-items:center;gap:16px}.ai-call-heading h2{font-size:1.45rem;margin:5px 0 0}.ai-call-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:23px}.ai-call-grid>div{min-width:0}.ai-call-grid h3{font-size:.86rem;margin-bottom:8px}.ai-call-grid pre{background:#172c3b;color:#dbe9e4;border-radius:9px;padding:17px;font-size:.71rem;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;max-height:440px;overflow:auto}.invalid-response{padding:26px 29px;margin-top:20px;background:#e8eeea}.invalid-response h2{font-size:1.35rem;margin:10px 0}.invalid-response p{margin-bottom:0;white-space:pre-wrap}
 @media(max-width:900px){.ai-call-grid{grid-template-columns:1fr}}@media(max-width:650px){.ai-call,.invalid-response{padding:20px}}
+
+/* Keep the account picker in place when switching between businesses and teams. */
+.identity-control .account-select{width:230px;flex:0 0 230px;min-width:0}
+.identity-control .account-select select{display:block;width:100%;max-width:none;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Live task text can be much longer than the seed examples. */
+.business-task,.business-task-main,.business-task-score{min-width:0}
+.business-task-top{flex-wrap:wrap}
+.business-task h2,.business-task p{overflow-wrap:anywhere}
+@media(max-width:650px){.identity-control .account-select{width:170px;flex-basis:170px}.business-task{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:380px){.identity-control .account-select{width:145px;flex-basis:145px}}
