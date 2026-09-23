@@ -73,6 +73,7 @@ function rate(card) {
       .map((item) => ({ key: item.key, label: item.label, gain: item.max - item.points, hint: item.hint }))
       .sort((a, b) => b.gain - a.gain),
     next_level: next ? { key: next.key, label: next.label, points_needed: next.min - score } : null,
+    penalties: [],
   }
 }
 
@@ -144,10 +145,23 @@ function taskById(id) {
 }
 function presentTask(task) {
   const published = state.tasks.filter((item) => item.status === 'published' && item.id !== task.id)
-  const score = task.status === 'published' ? task.official?.score ?? 0 : task.rating.score
-  const place = 1 + published.filter((item) => (item.official?.score ?? 0) > score || ((item.official?.score ?? 0) === score && String(item.published_at || '') > String(task.published_at || ''))).length
-  const position = { place, of: published.length + 1, projected: task.status !== 'published' }
-  return copy({ ...task, position, proposals: state.proposals.filter((item) => item.task_id === task.id).length })
+  const placeAt = (score) => ({ place: 1 + published.filter((item) => (item.official?.score ?? 0) > score).length, of: published.length + 1 })
+  const rating = rate(task.card)
+  const score = task.status === 'published' ? task.official?.score ?? 0 : rating.score
+  const position = { ...placeAt(score), projected: task.status !== 'published' }
+  const searchable = `${task.industry} ${Object.values(task.card).join(' ')}`.toLowerCase()
+  const audienceTeams = state.teams.map((team) => ({ id: team.id, name: team.name,
+    match: [...team.interests, ...team.skills, ...team.technologies].filter((term) => searchable.includes(term.toLowerCase())),
+  })).filter((team) => team.match.length)
+  const audience = { recommended: ['working', 'ready', 'priority'].includes(task.status === 'published' ? task.official?.level : rating.level), teams: audienceTeams }
+  rating.next_best = rating.next_best.map((item) => {
+    const thenScore = Math.min(100, rating.score + item.gain)
+    const thenLevel = levelFor(thenScore)
+    return { ...item, then: { score: thenScore, level: thenLevel.key, ...placeAt(thenScore),
+      teams: ['working', 'ready', 'priority'].includes(thenLevel.key) ? audienceTeams.map((team) => team.name) : [],
+    } }
+  })
+  return copy({ ...task, rating, position, audience, privacy: task.privacy || [], proposals: state.proposals.filter((item) => item.task_id === task.id).length })
 }
 function record(task, event) {
   task.rating = rate(task.card)

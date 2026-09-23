@@ -28,3 +28,32 @@
 .example-more{border:0;background:none;color:#9b632f;font-size:.78rem;font-weight:800;padding:12px 0 0}
 .example-more:hover{text-decoration:underline}
 .new-task-page .form-card{min-width:0}
+
+/* Clarification step: show answer progress and backend privacy findings. */
+.question-labels{display:flex;align-items:center;justify-content:space-between;gap:9px}
+.question-card.is-answered{border-color:#b9d8c4;background:#fcfffc}
+.answer-state{color:#4b8061;font-size:.7rem;font-weight:800}
+.questions-section>.error-box{margin:18px 0 0}
+.privacy-notice{border:1px solid #e9d3aa;background:#fff8e9;border-radius:12px;padding:19px 22px;margin:21px 0;color:#654f32}
+.privacy-notice-heading{display:flex;gap:12px;align-items:flex-start}
+.privacy-notice-heading>span{display:grid;place-items:center;width:25px;height:25px;flex:none;background:#e2a55c;color:#172c3b;border-radius:50%;font-weight:900}
+.privacy-notice-heading strong{font-size:.91rem}
+.privacy-notice-heading p{font-size:.78rem;margin:4px 0 0;color:#7c684a}
+.privacy-notice ul{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:8px}
+.privacy-notice li{display:grid;grid-template-columns:110px 1fr;gap:12px;padding-top:9px;border-top:1px solid #eddfc8}
+.privacy-notice li>span{font-size:.72rem;font-weight:850;color:#a16a32}
+.privacy-notice li strong{font-size:.8rem;font-weight:700}
+.privacy-notice li p{font-size:.76rem;margin:5px 0 0;color:#7c684a}
+.audience-card{padding:21px 24px;margin-top:15px}
+.audience-card ul{list-style:none;padding:0;margin:12px 0;display:grid;gap:8px}
+.audience-card li{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #ebf0eb}
+.audience-card li strong{font-size:.78rem}
+.audience-card li span{font-size:.71rem;color:#739080;text-align:right}
+.audience-card p{font-size:.76rem;color:#70867b;margin:11px 0 0;line-height:1.5}
+.rating-penalties{margin-top:20px;padding-top:16px;border-top:1px solid #e5ebe7}
+.rating-penalties h3{font-size:.95rem;margin-bottom:12px}
+.rating-penalties>div{display:grid;grid-template-columns:1fr auto;gap:4px 8px;padding:10px;background:#fff3eb;border-radius:8px;margin-top:7px}
+.rating-penalties strong,.rating-penalties span{font-size:.77rem}
+.rating-penalties span{color:#ad5d37;font-weight:850}
+.rating-penalties small{grid-column:1/3;color:#8d6f5d;line-height:1.4}
+@media(max-width:650px){.privacy-notice{padding:17px}.privacy-notice li{grid-template-columns:1fr;gap:3px}.audience-card li{flex-direction:column}.audience-card li span{text-align:left}}

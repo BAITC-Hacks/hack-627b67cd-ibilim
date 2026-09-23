@@ -5,6 +5,7 @@ import ErrorBox from '../components/ErrorBox.jsx'
 import Loader from '../components/Loader.jsx'
 import RatingPanel from '../components/RatingPanel.jsx'
 import RatingTimeline from '../components/RatingTimeline.jsx'
+import PrivacyNotice from '../components/PrivacyNotice.jsx'
 
 export default function CardEditor({ task, onTaskChange }) {
   const { meta } = useApp()
@@ -74,6 +75,7 @@ export default function CardEditor({ task, onTaskChange }) {
     <ErrorBox message={error} />
     {task.ai?.mode === 'stub' && <div className="notice-box">ИИ недоступен, работает локальная заглушка</div>}
     {!!task.ai?.warnings?.length && <div className="warning-box"><strong>Что требует проверки</strong><ul>{task.ai.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></div>}
+    <PrivacyNotice findings={task.privacy} fieldLabel={(key) => key === 'draft' ? 'Черновик' : meta?.fields?.find((field) => field.key === key)?.label || key} />
     <div className="timeline-section"><div className="section-heading"><div><span className="section-kicker">КАК ЗАДАЧА СТАЛА ЯСНЕЕ</span><h2>Рост рейтинга</h2></div><span>История изменений</span></div><RatingTimeline history={task.history} /></div>
     <div className="task-layout"><div className="task-main">
       <div className="surface draft-card"><span className="section-kicker">ВАШ ЧЕРНОВИК · {task.industry}</span><p>{task.draft_text}</p></div>
