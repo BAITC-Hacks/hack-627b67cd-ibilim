@@ -102,3 +102,38 @@ def test_proposal_to_unpublished_task_is_rejected(client):
     })
     assert r.status_code == 409
     assert r.json()["error"]["code"] == "conflict"
+
+
+def test_team_reads_confirmed_snapshot_until_business_confirms_again(client):
+    before = client.get("/api/catalog/4").json()
+    assert before["rating"]["score"] == before["official"]["score"] == 94
+    changed = client.put("/api/tasks/4/card", json={"card": {
+        "title": "НЕ ПОДТВЕРЖДЁННЫЙ ТЕКСТ", "success_criteria": "",
+    }}).json()
+    assert changed["confirmed"] is False
+    assert changed["rating"]["score"] != before["rating"]["score"]
+    # Бизнес продолжает видеть свой черновик, команда и каталог — предыдущий снимок.
+    assert client.get("/api/tasks/4").json()["card"] == changed["card"]
+    public = client.get("/api/catalog/4").json()
+    assert public == before
+    assert "НЕ ПОДТВЕРЖДЁННЫЙ" not in str(public)
+    assert not {"draft_text", "questions", "sources", "history", "ai"} & public.keys()
+    entry = next(t for t in client.get("/api/catalog").json() if t["id"] == 4)
+    assert entry["score"] == public["rating"]["score"]
+    assert entry["title"] == public["card"]["title"]
+
+    confirmed = client.post("/api/tasks/4/confirm").json()
+    public = client.get("/api/catalog/4").json()
+    assert public["card"] == confirmed["card"]
+    assert public["rating"]["score"] == confirmed["official"]["score"]
+    assert public["position"] == confirmed["position"]
+
+
+def test_public_detail_hides_unpublished_tasks_but_keeps_low_rating(client):
+    task = client.post("/api/tasks", json={"business_id": 1, "draft_text": DRAFT}).json()
+    assert client.get(f"/api/catalog/{task['id']}").status_code == 404
+    client.post(f"/api/tasks/{task['id']}/confirm")
+    assert client.get(f"/api/catalog/{task['id']}").status_code == 404
+    assert client.get("/api/catalog/99999").status_code == 404
+    low = client.get("/api/catalog/1")
+    assert low.status_code == 200 and low.json()["rating"]["score"] == 32

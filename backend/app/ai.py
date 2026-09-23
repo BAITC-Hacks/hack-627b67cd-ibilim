@@ -75,8 +75,11 @@ CARD_SCHEMA = {
 
 _RULES = (
     "Используй только сведения из текста пользователя. Для каждого заполненного поля верни "
-    "value — коротко и по-деловому — и quote: точную копию фрагмента текста пользователя, символ "
-    "в символ, без перефразирования, на которой основано значение. Не добавляй фактов, цифр, "
+    "value — одно или несколько полных предложений либо строк из текста пользователя, "
+    "дословно, с сохранением отрицаний, условий и единиц измерения — и quote: точную копию "
+    "фрагмента текста пользователя, на которой основано значение. Не перефразируй и не обрезай "
+    "предложения; короткая исходная фраза тоже подходит. Только для contact можно извлечь "
+    "адрес, телефон или ссылку из предложения. Не добавляй фактов, цифр, "
     "сроков, данных и контактов, которых нет в тексте; нет сведений — не включай поле. "
     "Пиши по-русски."
 )
@@ -111,19 +114,31 @@ def _norm(text: str) -> str:
 _FACTS = re.compile(r"https?://\S+|[\w.+-]+@[\w-]+\.[\w.-]+|@\w{3,}|\d+(?:[.,]\d+)?")
 
 
-def _stems(text: str) -> list[str]:
-    return [w[:5] for w in re.findall(r"\w+", text) if len(w) > 2]
-
-
 def _quoted(quote: str, haystack: str) -> bool:
-    """Цитата есть в тексте дословно или почти: ≥80% её слов (по основам) встречаются в тексте."""
+    """Цитата действительно есть в тексте; совпадения набора слов недостаточно."""
     q = _norm(quote)
-    if len(q) < 3:
-        return False
-    if q in haystack:
-        return True
-    words, known = _stems(q), set(_stems(haystack))
-    return len(words) >= 2 and sum(w in known for w in words) / len(words) >= 0.8
+    return len(q) >= 3 and re.search(r"(?<!\w)" + re.escape(q) + r"(?!\w)", haystack) is not None
+
+
+def _statements(text: str) -> list[str]:
+    # Не режем по запятым: условия и отрицания часто находятся в начале предложения.
+    return [s.strip() for s in re.split(r"(?<=[.!?])[ \t]+|[\r\n]+", text) if s.strip()]
+
+
+def _supported_value(field: str, value: str, quote: str, source: str) -> bool:
+    """Консервативное извлечение: целые исходные утверждения, без свободного пересказа."""
+    statements = _statements(source)
+    if field == "contact" and _CONTACT.fullmatch(value):
+        return any(
+            _quoted(value, _norm(statement)) and _quoted(value, _norm(quote))
+            and not re.search(r"\b(?:не|нет|нельзя|без)\b", statement, re.I)
+            for statement in statements
+        )
+    # Вопрос нельзя превратить в утверждение; знак числа и условия тоже сохраняются.
+    normalize = lambda text: re.sub(r"\s+", " ", text.lower().replace("ё", "е")).strip(" .")
+    known = {normalize(statement) for statement in statements}
+    return all(normalize(statement) in known and _quoted(statement, _norm(quote))
+               for statement in _statements(value))
 
 
 def _verify(items: list[dict], source: str) -> tuple[dict, dict, list[str]]:
@@ -138,9 +153,13 @@ def _verify(items: list[dict], source: str) -> tuple[dict, dict, list[str]]:
         if not _quoted(quote, haystack):
             warnings.append(f"{label}: цитата не найдена в тексте — значение отброшено")
             continue
-        invented = [t for t in _FACTS.findall(value) if _norm(t) not in haystack]
+        known_facts = {_norm(t) for t in _FACTS.findall(source)}
+        invented = [t for t in _FACTS.findall(value) if _norm(t) not in known_facts]
         if invented:
             warnings.append(f"{label}: «{', '.join(invented)}» нет в тексте — значение отброшено")
+            continue
+        if not _supported_value(field, value, quote, source):
+            warnings.append(f"{label}: формулировка не подтверждена полными фразами пользователя — значение отброшено")
             continue
         card[field] = value
         sources[field] = quote.strip()
@@ -318,8 +337,8 @@ def student_check(card: dict) -> dict:
 ASSIST_SYSTEM = (
     "Ты помогаешь представителю бизнеса улучшить карточку задачи для студентов. Тебе дают текст "
     "бизнеса (черновик и ответы), текущую карточку и список слабых полей с подсказками, чего не "
-    "хватает. Для каждого слабого поля перепиши значение так, чтобы оно было полнее и конкретнее, "
-    "но только из сведений, которые есть в тексте бизнеса или других полях карточки. "
+    "хватает. Для каждого слабого поля подбери более полное и конкретное исходное предложение "
+    "или несколько предложений из текста бизнеса или других полей карточки. "
     + _RULES
 )
 
@@ -385,8 +404,9 @@ def spec() -> dict:
             },
         ],
         "validation": [
-            "ответ модели — JSON по строгой схеме (Structured Outputs, strict: true)",
+            "ответ модели — JSON по строгой схеме (Structured Outputs, strict: true); типы, обязательные поля и enum проверяются также локально",
             "у каждого значения есть дословная цитата из текста пользователя — иначе значение отброшено",
+            "значение состоит из полных исходных фраз с сохранением отрицаний и условий; контакт можно извлечь дословно",
             "числа, email, ссылки и @ники в значении должны встречаться в тексте пользователя",
             "вопросов не меньше 3 — недостающие добираются из базы вопросов по самым весомым показателям",
             "поля, которые правил человек, ИИ не перезаписывает",

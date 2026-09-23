@@ -38,6 +38,33 @@ def client() -> OpenAI:
     return _client
 
 
+def _validate_schema(value, schema: dict, path: str = "$") -> None:
+    """Локально проверяет типы, обязательные поля и enum наших схем Structured Outputs.
+
+    Строгая схема на стороне API не заменяет проверку ответа перед использованием.
+    Поддерживаемые типы намеренно ограничены схемами в ai.py; неизвестная схема отклоняется.
+    """
+    kind = schema.get("type")
+    types = {"object": dict, "array": list, "string": str, "boolean": bool}
+    if kind not in types or type(value) is not types[kind]:
+        raise ValueError(f"{path}: ожидается {kind}")
+    if "enum" in schema and value not in schema["enum"]:
+        raise ValueError(f"{path}: значение вне допустимого списка")
+    if kind == "object":
+        properties = schema.get("properties", {})
+        missing = set(schema.get("required", [])) - value.keys()
+        if missing:
+            raise ValueError(f"{path}: отсутствуют поля {', '.join(sorted(missing))}")
+        if schema.get("additionalProperties") is False and value.keys() - properties.keys():
+            raise ValueError(f"{path}: лишние поля")
+        for key, item in value.items():
+            if key in properties:
+                _validate_schema(item, properties[key], f"{path}.{key}")
+    elif kind == "array":
+        for index, item in enumerate(value):
+            _validate_schema(item, schema["items"], f"{path}[{index}]")
+
+
 def call_json(
     name: str,
     system: str,
@@ -68,6 +95,7 @@ def call_json(
                 **extra,
             )
             data = json.loads(response.choices[0].message.content or "")
+            _validate_schema(data, schema)
             if validate:
                 validate(data)
             return data, attempt

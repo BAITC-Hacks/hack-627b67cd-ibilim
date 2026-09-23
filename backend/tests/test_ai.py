@@ -1,3 +1,5 @@
+import pytest
+
 from app import ai, llm
 
 DRAFT = "Хотим понимать, какие поля скоро потребуют полива. Пишите на agro@sever.kz"
@@ -64,3 +66,67 @@ def test_spec_shows_prompts_and_schemas():
     assert [c["name"] for c in spec["calls"]] == ["analyze_draft", "build_card", "student_check", "assist_card"]
     assert all(c["system"] and c["output_schema"] for c in spec["calls"])
     assert spec["invalid_response"]
+
+
+@pytest.mark.parametrize("source,value", [
+    ("Хотим прогноз полива по данным датчиков влажности", "Данные хранятся в PostgreSQL и обновляются ежедневно"),
+    ("Данных датчиков влажности нет", "Данные датчиков влажности есть"),
+    ("Если получим согласие, предоставим выгрузку", "Предоставим выгрузку"),
+    ("Нельзя выносить данные за пределы хозяйства", "Выносить данные за пределы хозяйства"),
+    ("Операторы проверяют заявки клиентов", "Клиенты проверяют заявки операторов"),
+    ("Есть выгрузка CSV?", "Есть выгрузка CSV"),
+])
+def test_value_must_be_supported_even_with_a_real_quote(source, value):
+    card, sources, warnings = ai._verify([{"field": "data", "value": value, "quote": source}], source)
+    assert card == sources == {}
+    assert any("формулировка не подтверждена" in warning for warning in warnings)
+
+
+def test_word_overlap_does_not_make_a_quote_real():
+    source = "Мы пока не можем предоставить выгрузку данных клиентов"
+    quote = "Мы можем предоставить выгрузку данных клиентов"
+    card, _, warnings = ai._verify([{"field": "data", "value": quote, "quote": quote}], source)
+    assert card == {} and "цитата не найдена" in warnings[0]
+
+
+def test_number_must_match_whole_fact_not_substring():
+    source = "Выгрузка содержит 180 строк"
+    card, _, warnings = ai._verify(
+        [{"field": "data", "value": "Выгрузка содержит 80 строк", "quote": source}], source)
+    assert card == {} and "80" in warnings[0]
+
+
+@pytest.mark.parametrize("field,text", [
+    ("success_criteria", "Точность прогноза не ниже 80%"),
+    ("data", "SQL-выгрузка"),
+    ("data", "CSV, API"),
+    ("constraints", "Нельзя выносить данные за пределы хозяйства"),
+    ("data", "Если получим согласие, предоставим выгрузку"),
+])
+def test_honest_short_statements_and_conditions_are_kept(field, text):
+    card, sources, warnings = ai._verify([{"field": field, "value": text, "quote": text}], text)
+    assert card == sources == {field: text}
+    assert warnings == []
+
+
+def test_complete_sentences_can_be_selected_from_a_longer_source():
+    source = "Работаем вручную. Датчики дают CSV за 2 года. Нужен прогноз полива."
+    text = "Датчики дают CSV за 2 года."
+    card, _, warnings = ai._verify([{"field": "data", "value": text, "quote": text}], source)
+    assert card == {"data": text} and not warnings
+
+
+def test_assistant_can_move_a_supported_criterion_into_an_empty_field(monkeypatch):
+    from app import tasks
+
+    criterion = "Точность прогноза не ниже 80%."
+    source = f"Нужен прогноз полива. {criterion}"
+    card = {"context": source, "success_criteria": ""}
+    fake_llm(monkeypatch, {"fields": [
+        {"field": "success_criteria", "value": criterion, "quote": criterion},
+    ]})
+    result = ai.assist(source, card, [{"field": "success_criteria", "hint": "Назовите метрику"}])
+    suggestions = tasks.assist_result(card, result)["suggestions"]
+    assert len(suggestions) == 1
+    assert suggestions[0]["value"] == suggestions[0]["quote"] == criterion
+    assert suggestions[0]["gain"] == 15

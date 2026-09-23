@@ -98,6 +98,31 @@ def listing(conn: sqlite3.Connection, industry: str | None = None, level: str | 
     return result
 
 
+def detail(conn: sqlite3.Connection, task_id: int) -> dict:
+    """Карточка для команды: только опубликованный подтверждённый снимок и его рейтинг."""
+    row = conn.execute(
+        "SELECT t.id, t.industry, t.confirmed_card, t.score, t.level, t.published_at, "
+        "b.id AS business_id, b.name AS business, "
+        "(SELECT COUNT(*) FROM proposal AS p WHERE p.task_id = t.id) AS proposals "
+        "FROM task AS t JOIN business AS b ON b.id = t.business_id "
+        "WHERE t.id = ? AND t.status = 'published' AND t.confirmed_card IS NOT NULL",
+        (task_id,),
+    ).fetchone()
+    if row is None:
+        raise errors.NotFound("Опубликованная задача не найдена")
+    snapshot = json.loads(row["confirmed_card"])
+    card = {field: snapshot.get(field, "") for field in rating.FIELDS}
+    return {
+        "id": row["id"], "status": "published",
+        "business": {"id": row["business_id"], "name": row["business"]},
+        "industry": row["industry"] or "", "card": card, "rating": rating.score(card),
+        "official": {"score": row["score"], "level": row["level"]},
+        "position": {**place(conn, row["score"], row["id"]), "projected": False},
+        "proposals": row["proposals"],
+        "published_at": row["published_at"].replace(" ", "T") + "Z",
+    }
+
+
 def recommend(conn: sqlite3.Connection, team_id: int, limit: int = 5) -> list[dict]:
     """GET /api/teams/{id}/recommendations. Опубликованные задачи уровня working и выше.
 

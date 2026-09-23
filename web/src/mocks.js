@@ -1,5 +1,5 @@
 // Демо-данные повторяют формы ответов из partner/01-api.md.
-const STORAGE_KEY = 'challenge-hub-mocks-v1'
+const STORAGE_KEY = 'challenge-hub-mocks-v2'
 const now = () => new Date().toISOString()
 const copy = (value) => JSON.parse(JSON.stringify(value))
 
@@ -82,7 +82,7 @@ function seededTask(id, businessId, industry, draftText, cardFields, hoursAgo) {
   const rating = rate(card)
   return {
     id, status: 'published', business: copy(businesses.find((item) => item.id === businessId)),
-    industry, draft_text: draftText, card,
+    industry, draft_text: draftText, card, confirmed_card: copy(card),
     sources: Object.fromEntries(Object.entries(card).filter(([, value]) => value).map(([key]) => [key, 'manual'])),
     questions: [], rating, confirmed: true,
     official: { score: rating.score, level: rating.level },
@@ -231,6 +231,7 @@ function confirmTask(id) {
   task.confirmed = true
   task.rating = rate(task.card)
   task.official = { score: task.rating.score, level: task.rating.level }
+  task.confirmed_card = copy(task.card)
   return record(task, 'confirm')
 }
 
@@ -294,14 +295,23 @@ function catalog(industry, level) {
     .filter((task) => !level || task.official?.level === level)
     .sort((a, b) => (b.official?.score || 0) - (a.official?.score || 0) || String(b.published_at).localeCompare(String(a.published_at)))
     .map((task) => ({
-      id: task.id, title: task.card.title, industry: task.industry, business: task.business.name,
-      summary: task.draft_text.length > 140 ? `${task.draft_text.slice(0, 140)}…` : task.draft_text,
+      id: task.id, title: task.confirmed_card.title, industry: task.industry, business: task.business.name,
+      summary: (task.confirmed_card.need || task.confirmed_card.context || '').slice(0, 160),
       score: task.official.score, level: task.official.level,
       level_label: levelFor(task.official.score).label,
       needs_clarification: task.official.level === 'draft', highlight: task.official.level === 'priority',
       proposals: state.proposals.filter((item) => item.task_id === task.id).length,
       published_at: task.published_at,
     }))
+}
+
+function publishedTask(id) {
+  const task = taskById(id)
+  if (task.status !== 'published' || !task.confirmed_card) throw error(404, 'Опубликованная задача не найдена')
+  const view = presentTask({ ...task, card: task.confirmed_card })
+  return copy({ id: task.id, status: task.status, business: task.business, industry: task.industry,
+    card: task.confirmed_card, rating: rate(task.confirmed_card), official: task.official,
+    position: view.position, proposals: view.proposals, published_at: task.published_at })
 }
 
 function recommendations(teamId) {
@@ -418,6 +428,7 @@ export async function mockRequest(method, path, body) {
   if ((match = route.match(/^\/tasks\/(\d+)\/student-check$/)) && method === 'POST') return studentCheck(match[1])
   if (method === 'POST' && route === '/rating/preview') return rate(body.card)
   if (method === 'GET' && route === '/catalog') return copy(catalog(url.searchParams.get('industry'), url.searchParams.get('level')))
+  if ((match = route.match(/^\/catalog\/(\d+)$/)) && method === 'GET') return publishedTask(match[1])
   if ((match = route.match(/^\/teams\/(\d+)\/recommendations$/)) && method === 'GET') return copy(recommendations(match[1]))
   if ((match = route.match(/^\/tasks\/(\d+)\/proposals$/))) {
     if (method === 'GET') return copy(state.proposals.filter((item) => item.task_id === Number(match[1])))

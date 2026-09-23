@@ -205,6 +205,12 @@ def catalog_listing(industry: str | None = None, level: str | None = None) -> li
         return catalog.listing(conn, industry, level)
 
 
+@app.get("/api/catalog/{task_id}")
+def catalog_detail(task_id: int) -> dict:
+    with _tx() as conn:
+        return catalog.detail(conn, task_id)
+
+
 @app.get("/api/teams/{team_id}/recommendations")
 def recommendations(team_id: int) -> list[dict]:
     with _tx() as conn:

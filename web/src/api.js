@@ -54,6 +54,7 @@ export const checkTaskAsStudent = (id) => request(`/tasks/${id}/student-check`, 
 export const previewRating = (card) => request('/rating/preview', 'POST', { card })
 
 export const getCatalog = ({ industry, level } = {}) => request(`/catalog${query({ industry, level })}`)
+export const getPublishedTask = (id) => request(`/catalog/${id}`)
 export const getRecommendations = (teamId) => request(`/teams/${teamId}/recommendations`)
 
 export const createProposal = (taskId, { teamId, idea, plan, timeline, link }) =>
