@@ -160,8 +160,8 @@ web/
 ## Запуск
 
 ```bash
-# бэк (Python 3.11–3.12; на 3.14 не соберётся pydantic)
-python3.12 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
+# бэк (Python 3.11–3.14) — или одной командой из корня: ./run.sh (соберёт и фронт)
+python3 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
 cd backend && ../.venv/bin/uvicorn app.main:app --reload --port 8000
 
 # фронт
