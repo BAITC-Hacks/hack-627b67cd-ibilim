@@ -111,6 +111,21 @@ def _norm(text: str) -> str:
 _FACTS = re.compile(r"https?://\S+|[\w.+-]+@[\w-]+\.[\w.-]+|@\w{3,}|\d+(?:[.,]\d+)?")
 
 
+def _stems(text: str) -> list[str]:
+    return [w[:5] for w in re.findall(r"\w+", text) if len(w) > 2]
+
+
+def _quoted(quote: str, haystack: str) -> bool:
+    """Цитата есть в тексте дословно или почти: ≥80% её слов (по основам) встречаются в тексте."""
+    q = _norm(quote)
+    if len(q) < 3:
+        return False
+    if q in haystack:
+        return True
+    words, known = _stems(q), set(_stems(haystack))
+    return len(words) >= 2 and sum(w in known for w in words) / len(words) >= 0.8
+
+
 def _verify(items: list[dict], source: str) -> tuple[dict, dict, list[str]]:
     """Ответ модели → (card, sources, warnings): остаются только значения с цитатой из текста."""
     haystack = _norm(source)
@@ -120,7 +135,7 @@ def _verify(items: list[dict], source: str) -> tuple[dict, dict, list[str]]:
         if field not in FIELDS or not value or field in card:  # одно значение на поле — без дублей
             continue
         label = LABELS[field]
-        if len(_norm(quote)) < 3 or _norm(quote) not in haystack:
+        if not _quoted(quote, haystack):
             warnings.append(f"{label}: цитата не найдена в тексте — значение отброшено")
             continue
         invented = [t for t in _FACTS.findall(value) if _norm(t) not in haystack]
