@@ -14,7 +14,8 @@ def test_create_on_low_rated_published_task_and_no_commit(conn):
     assert result["status"] == "submitted"
     assert result["comment"] == ""
     assert result["decided_at"] is None
-    assert "T" in result["created_at"]
+    created_at = conn.execute("SELECT created_at FROM proposal WHERE id = ?", (result["id"],)).fetchone()[0]
+    assert result["created_at"] == created_at.replace(" ", "T") + "Z"
     assert conn.in_transaction
     assert len(proposals.for_task(conn, 1)) == 2
 
@@ -61,6 +62,8 @@ def test_business_can_accept_multiple_proposals_manually(conn):
     assert accepted_seed["status"] == accepted_new["status"] == "accepted"
     assert accepted_seed["comment"] == "Подходит"
     assert accepted_seed["decided_at"] is not None
+    decided_at = conn.execute("SELECT decided_at FROM proposal WHERE id = 1").fetchone()[0]
+    assert accepted_seed["decided_at"] == decided_at.replace(" ", "T") + "Z"
     assert conn.execute("SELECT COUNT(*) FROM proposal WHERE task_id = 1 AND status = 'accepted'").fetchone()[0] == 2
 
 

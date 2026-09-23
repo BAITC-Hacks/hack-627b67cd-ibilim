@@ -16,8 +16,8 @@ def _proposal(row: sqlite3.Row) -> dict:
         "team": {"id": row["team_id"], "name": row["team_name"]},
         "idea": row["idea"], "plan": row["plan"], "timeline": row["timeline"],
         "link": row["link"], "status": row["status"], "comment": row["comment"],
-        "created_at": row["created_at"].replace(" ", "T"),
-        "decided_at": row["decided_at"].replace(" ", "T") if row["decided_at"] else None,
+        "created_at": row["created_at"].replace(" ", "T") + "Z",
+        "decided_at": row["decided_at"].replace(" ", "T") + "Z" if row["decided_at"] else None,
     }
 
 

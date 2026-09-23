@@ -1,7 +1,7 @@
 """AI Sana Challenge Hub — API. Контракт заморожен в docs/02-api.md, правки только через него."""
 
 import json
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from http import HTTPStatus
 from pathlib import Path
 
@@ -18,7 +18,13 @@ from .errors import BadRequest, Conflict, NotFound
 ROOT = Path(__file__).resolve().parents[2]
 WEB_DIST = ROOT / "web" / "dist"
 
-app = FastAPI(title="AI Sana Challenge Hub", version="0.2.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.init()
+    yield
+
+
+app = FastAPI(title="AI Sana Challenge Hub", version="0.2.0", lifespan=lifespan)
 
 
 # --- ошибки в формате контракта: {"error": {"code": "...", "message": "..."}} -------------
@@ -69,11 +75,6 @@ def _tx():
             yield conn
     finally:
         conn.close()
-
-
-@app.on_event("startup")
-def startup() -> None:
-    db.init()
 
 
 # --- справочники -----------------------------------------------------------------------
@@ -247,8 +248,9 @@ def ai_spec() -> dict:
 
 # --- статика фронта (один сервис = одна ссылка) -----------------------------------------
 
-if WEB_DIST.exists():
-    app.mount("/assets", StaticFiles(directory=WEB_DIST / "assets"), name="assets")
+if (WEB_DIST / "index.html").exists():
+    if (WEB_DIST / "assets").is_dir():
+        app.mount("/assets", StaticFiles(directory=WEB_DIST / "assets"), name="assets")
 
     @app.get("/{full_path:path}")
     def spa(full_path: str) -> FileResponse:

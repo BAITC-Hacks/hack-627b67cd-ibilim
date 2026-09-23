@@ -43,7 +43,7 @@ AI-функция 10 · техническое качество 10 · демо 5
 
 ## Стек
 
-- backend: Python 3.11–3.12, FastAPI, SQLite, OpenAI SDK со Structured Outputs; LLM — только через `backend/app/llm.py`.
+- backend: Python 3.11–3.14, FastAPI, SQLite, OpenAI SDK со Structured Outputs; LLM — только через `backend/app/llm.py`.
 - web: Vite + React, fetch к `/api`, свой CSS. В проде FastAPI отдаёт и `/api`, и `web/dist` — одна ссылка.
 
 ## Кто что делает
@@ -55,8 +55,8 @@ AI-функция 10 · техническое качество 10 · демо 5
 
 | Кто | Файлы | Задачи |
 |---|---|---|
-| **Арслан · Claude** | `main.py`, `db.py`, `schema.sql`, `llm.py`, `errors.py`, `ai.py`, `tasks.py`, `tests/conftest.py`, `docs/` (кроме `03-rating.md`) | контракт, ИИ-функции, жизненный цикл задачи, все роуты |
-| **Арслан · Codex** | `rating.py`, `catalog.py`, `proposals.py`, `seed/*.json`, `tests/test_<модуль>.py`, `docs/03-rating.md`; в конце `README.md`, `Dockerfile` | рейтинг, каталог, отклики и выбор бизнеса, синтетические данные, README |
+| **Арслан · Claude** | `main.py`, `db.py`, `schema.sql`, `llm.py`, `errors.py`, `ai.py`, `tasks.py`, `tests/conftest.py`, `tests/test_{ai,tasks,scenario}.py`, `run.sh`, `.env.example`, `docs/` (кроме `03-rating.md`) | контракт, ИИ-функции, жизненный цикл задачи, все роуты, запуск одной командой |
+| **Арслан · Codex** | `rating.py`, `catalog.py`, `proposals.py`, `seed/*.json`, `tests/test_<модуль>.py`, `docs/03-rating.md`; в конце `README.md` | рейтинг, каталог, отклики и выбор бизнеса, синтетические данные, README |
 | **Напарник** | `web/` целиком | все экраны сценария, сборка `web/dist`, деплой; свои коммиты каждый час |
 
 - Сигнатуры и докстринги в заготовках — контракт между агентами: `main.py` и `tasks.py` их
@@ -64,7 +64,7 @@ AI-функция 10 · техническое качество 10 · демо 5
 - Функции модулей получают `conn` и **не делают `commit`** — транзакцию закрывает роут в `main.py`.
   Ошибки — `errors.NotFound / Conflict / BadRequest`, в HTTP их переводит `main.py`.
 - Тесты: `cd backend && ../.venv/bin/python -m pytest`; фикстура `conn` из `tests/conftest.py` —
-  БД в памяти со схемой и сидом. Общую `ibilim.db` тесты не трогают.
+  БД в памяти со схемой и сидом. Общую `hub.db` тесты не трогают.
 
 ## Документы
 
@@ -77,7 +77,7 @@ AI-функция 10 · техническое качество 10 · демо 5
 ## Команды
 
 ```bash
-python3.12 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
+python3 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
 cd backend && ../.venv/bin/uvicorn app.main:app --reload --port 8000   # http://localhost:8000/api/health
 ../.venv/bin/python -m app.db       # пересоздать БД и сид
 ../.venv/bin/python -m pytest       # тесты, БД в памяти

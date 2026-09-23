@@ -10,8 +10,12 @@ import sqlite3
 from . import errors, rating
 
 
+def _stem(word: str) -> str:
+    return word[:5] if len(word) >= 5 else word
+
+
 def _words(value: str) -> set[str]:
-    return set(re.findall(r"\w+", value.lower(), re.UNICODE))
+    return {_stem(word) for word in re.findall(r"\w+", value.lower(), re.UNICODE)}
 
 
 def _summary(card: dict) -> str:
@@ -53,7 +57,7 @@ def listing(conn: sqlite3.Connection, industry: str | None = None, level: str | 
             "level": row["level"], "level_label": labels.get(row["level"], ""),
             "needs_clarification": row["level"] == "draft",
             "highlight": row["level"] == "priority", "proposals": row["proposals"],
-            "published_at": row["published_at"],
+            "published_at": row["published_at"].replace(" ", "T") + "Z" if row["published_at"] else None,
         })
     return result
 
@@ -61,8 +65,9 @@ def listing(conn: sqlite3.Connection, industry: str | None = None, level: str | 
 def recommend(conn: sqlite3.Connection, team_id: int, limit: int = 5) -> list[dict]:
     """GET /api/teams/{id}/recommendations. Опубликованные задачи уровня working и выше.
 
-    match — пересечение слов команды (interests + skills + technologies, в нижнем регистре) со
-    словами задачи (industry + текст confirmed_card). Только задачи с непустым match; сортировка —
+    match — слова команды (interests + skills + technologies), чьи основы есть в задаче
+    (industry + текст confirmed_card). Основа слова длиной от 5 символов — первые 5 символов,
+    короткие слова сравниваются целиком. Только задачи с непустым match; сортировка —
     длина match, затем score. Нет команды → errors.NotFound. Объяснимо, без LLM.
     """
     team = conn.execute(
@@ -74,8 +79,10 @@ def recommend(conn: sqlite3.Connection, team_id: int, limit: int = 5) -> list[di
     for field in ("interests", "skills", "technologies"):
         for phrase in json.loads(team[field] or "[]"):
             team_words.extend(re.findall(r"\w+", phrase.lower(), re.UNICODE))
-    # Keep the team's own ordering in the explanation and count each word once.
-    team_words = list(dict.fromkeys(team_words))
+    # Keep the team's wording and order in the explanation; count each stem once.
+    team_stems = {}
+    for word in team_words:
+        team_stems.setdefault(_stem(word), word)
 
     matches = []
     rows = conn.execute(
@@ -86,7 +93,7 @@ def recommend(conn: sqlite3.Connection, team_id: int, limit: int = 5) -> list[di
     for row in rows:
         card = json.loads(row["confirmed_card"] or "{}")
         task_words = _words(" ".join([row["industry"] or "", *(str(value) for value in card.values())]))
-        common = [word for word in team_words if word in task_words]
+        common = [word for stem, word in team_stems.items() if stem in task_words]
         if common:
             matches.append((
                 len(common),

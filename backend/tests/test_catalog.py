@@ -14,6 +14,8 @@ def test_listing_is_official_sorted_and_keeps_low_score(conn):
     assert items[0]["highlight"] is True
     assert items[-1]["proposals"] == 1
     assert all(len(item["summary"]) <= 160 for item in items)
+    published_at = conn.execute("SELECT published_at FROM task WHERE id = 4").fetchone()[0]
+    assert items[0]["published_at"] == published_at.replace(" ", "T") + "Z"
 
 
 def test_listing_filters_and_uses_confirmed_card(conn):
@@ -35,12 +37,22 @@ def test_listing_tie_newer_first_and_unpublished_hidden(conn):
 
 
 def test_recommend_matches_words_and_excludes_draft(conn):
-    # The only agricultural task is a published draft; it stays in the catalog.
-    assert catalog.recommend(conn, 1) == []
+    # The agricultural task is a published draft; it stays in the catalog.
+    assert catalog.recommend(conn, 1)[0]["task_id"] == 5  # аналитика ↔ Аналитики
     recommendations = catalog.recommend(conn, 3)
     assert recommendations[0]["task_id"] == 3
     assert "логистика" in recommendations[0]["match"]
     assert all(item["level"] != "draft" for item in recommendations)
+
+
+def test_recommend_matches_first_five_letters_and_counts_stem_once(conn):
+    conn.execute(
+        "UPDATE team SET interests = ?, skills = '[]', technologies = '[]' WHERE id = 1",
+        (json.dumps(["аналитика", "аналитики"], ensure_ascii=False),),
+    )
+    items = catalog.recommend(conn, 1)
+    assert [item["task_id"] for item in items] == [5]
+    assert items[0]["match"] == ["аналитика"]
 
 
 def test_recommend_sorts_match_count_then_score_and_honors_limit(conn):

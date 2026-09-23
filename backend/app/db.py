@@ -8,7 +8,7 @@ from pathlib import Path
 from . import rating
 
 ROOT = Path(__file__).resolve().parents[2]
-DB_PATH = Path(os.getenv("DB_PATH", "ibilim.db"))
+DB_PATH = Path(os.getenv("DB_PATH", "hub.db"))
 if not DB_PATH.is_absolute():  # относительный путь — от backend/, а не от папки запуска
     DB_PATH = ROOT / "backend" / DB_PATH
 SCHEMA = Path(__file__).with_name("schema.sql")

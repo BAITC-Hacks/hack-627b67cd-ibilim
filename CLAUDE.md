@@ -24,7 +24,7 @@
 
 ```bash
 cp .env.example .env                                   # OPENAI_API_KEY; без ключа — заглушка
-python3.12 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
+python3 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
 cd backend && ../.venv/bin/uvicorn app.main:app --reload --port 8000
 ../.venv/bin/python -m app.db                          # пересоздать БД и сид
 ```
