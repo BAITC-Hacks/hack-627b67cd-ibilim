@@ -42,6 +42,11 @@ def test_mandatory_demo_end_to_end(client):
     task = r.json()
     assert task["rating"]["level"] == "draft" and len(task["questions"]) >= 3
     assert task["ai"]["mode"] == "stub"
+    # черновик не рекомендуем, но видно, кому он подходит и что даст улучшение
+    assert not task["audience"]["recommended"]
+    assert team["name"] in [t["name"] for t in task["audience"]["teams"]]
+    then = task["rating"]["next_best"][0]["then"]
+    assert then["score"] > task["rating"]["score"] and then["place"] <= task["position"]["place"]
 
     # 2. ответы → карточка, рейтинг вырос
     answers = [{"question_id": q["id"], "answer": ANSWERS.get(q["field"], "")} for q in task["questions"]]

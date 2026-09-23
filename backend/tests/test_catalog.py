@@ -71,6 +71,23 @@ def test_recommend_matches_first_five_letters_and_counts_stem_once(conn):
     assert items[0]["match"] == ["аналитика"]
 
 
+def test_audience_matches_industry_and_card_without_level_gate(conn):
+    teams = catalog.audience(conn, "Агро", {"need": "Прогноз полива"})
+    assert teams == [{"id": 1, "name": "DataCats", "match": ["агро", "полив"]}]
+
+
+def test_audience_matches_stems_sorts_by_match_count_and_deduplicates(conn):
+    conn.execute(
+        "UPDATE team SET interests = ?, skills = '[]', technologies = '[]' WHERE id = 1",
+        (json.dumps(["аналитика", "аналитики"], ensure_ascii=False),),
+    )
+    teams = catalog.audience(conn, "Финансы", {"users": "Аналитики службы"})
+    assert teams[0] == {"id": 5, "name": "FinCraft", "match": ["финансы", "аналитика"]}
+    assert teams[1] == {"id": 1, "name": "DataCats", "match": ["аналитика"]}
+    assert [team["id"] for team in teams] == [5, 1, 2, 4]
+    assert catalog.audience(conn, "", {}) == []
+
+
 def test_recommend_sorts_match_count_then_score_and_honors_limit(conn):
     conn.execute(
         "UPDATE team SET interests = ?, skills = '[]', technologies = '[]' WHERE id = 4",

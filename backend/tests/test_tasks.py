@@ -73,6 +73,18 @@ def test_validation_errors(db):
         tasks.answer(db, task["id"], [{"question_id": 777777, "answer": "x"}])
 
 
+def test_iin_never_reaches_storage_or_ai(db, monkeypatch):
+    seen = {}
+    real = tasks.ai.analyze_draft
+    monkeypatch.setattr(tasks.ai, "analyze_draft", lambda text, industry: seen.setdefault("text", text) and real(text, industry))
+    task = tasks.create(db, 99, "Дадим выгрузку клиентов с ФИО, ИИН 900101300017", "")
+    assert "900101300017" not in task["draft_text"] and "900101300017" not in seen["text"]
+    kinds = {p["kind"] for p in task["privacy"]}
+    assert kinds == {"iin", "personal_data"}
+    task = tasks.edit(db, task["id"], {"constraints": "Данные передадим обезличенными"})
+    assert {p["kind"] for p in task["privacy"]} == {"iin"}  # предупреждение снято, факт маскирования остался
+
+
 def test_meta_levels_cover_0_to_100():
     levels = tasks.meta()["levels"]
     assert levels[0]["min"] == 0 and levels[-1]["max"] == 100

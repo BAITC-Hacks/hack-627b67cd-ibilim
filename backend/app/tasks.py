@@ -7,11 +7,12 @@
 import json
 import sqlite3
 
-from . import ai, catalog, db, rating
+from . import ai, catalog, db, privacy, rating
 from .errors import BadRequest, Conflict, NotFound
 
 INDUSTRIES = ["Агро", "Ритейл", "Логистика", "Образование", "Финансы", "Производство", "IT", "Госсектор"]
 MAX_DRAFT, MAX_FIELD = 5000, 2000
+RECOMMENDABLE = {"working", "ready", "priority"}  # ТЗ §4: рекомендовать можно с «рабочей»
 
 
 def meta() -> dict:
@@ -77,6 +78,16 @@ def _out(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
     published = row["status"] == "published" and row["score"] is not None
     position = {**catalog.place(conn, row["score"] if published else preview["score"], row["id"]),
                 "projected": not published}
+    teams = catalog.audience(conn, row["industry"] or "", card)
+    level_now = row["level"] if published else preview["level"]
+    # «что даст улучшение»: балл, место и кому начнут рекомендовать, если довести показатель до максимума
+    for item in preview["next_best"]:
+        then_score = min(100, preview["score"] + item["gain"])
+        then_level, _ = rating.level(then_score)
+        item["then"] = {
+            "score": then_score, "level": then_level, **catalog.place(conn, then_score, row["id"]),
+            "teams": [t["name"] for t in teams] if then_level in RECOMMENDABLE else [],
+        }
     return {
         "id": row["id"],
         "status": row["status"],
@@ -90,6 +101,12 @@ def _out(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
         "confirmed": bool(row["confirmed"]),
         "official": {"score": row["score"], "level": row["level"]} if row["score"] is not None else None,
         "position": position,
+        "audience": {"recommended": level_now in RECOMMENDABLE, "teams": teams},
+        # контакт и формат — данные самого бизнеса, их не проверяем
+        "privacy": json.loads(row["privacy"]) + privacy.warnings({
+            "draft": row["draft_text"],
+            **{f: v for f, v in card.items() if v and f not in ("contact", "interaction_format")},
+        }),
         "history": [
             {"at": _iso(h["created_at"]), "event": h["event"], "score": h["score"],
              "level": h["level"], "confirmed": bool(h["confirmed"])}
@@ -112,12 +129,15 @@ def create(conn: sqlite3.Connection, business_id: int, draft_text: str, industry
         raise NotFound("бизнес не найден")
     industry = industry.strip() or (business["industry"] or "")
 
+    draft_text, masked = privacy.mask(draft_text, "draft")  # до ИИ и до записи в БД
     result = ai.analyze_draft(draft_text, industry)
     card = {**_blank_card(), **result["card"]}
     cur = conn.execute(
-        "INSERT INTO task (business_id, industry, draft_text, status, card, sources, ai_meta) VALUES (?,?,?, 'new', ?,?,?)",
+        "INSERT INTO task (business_id, industry, draft_text, status, card, sources, ai_meta, privacy)"
+        " VALUES (?,?,?, 'new', ?,?,?,?)",
         (business_id, industry, draft_text, json.dumps(card, ensure_ascii=False),
-         json.dumps(result["sources"], ensure_ascii=False), json.dumps(result["ai"], ensure_ascii=False)),
+         json.dumps(result["sources"], ensure_ascii=False), json.dumps(result["ai"], ensure_ascii=False),
+         json.dumps(masked, ensure_ascii=False)),
     )
     task_id = cur.lastrowid
     conn.executemany(
@@ -141,12 +161,15 @@ def for_business(conn: sqlite3.Connection, business_id: int) -> list[dict]:
 
 def answer(conn: sqlite3.Connection, task_id: int, answers: list[dict]) -> dict:
     row = _row(conn, task_id)
-    own = {q["id"] for q in conn.execute("SELECT id FROM question WHERE task_id = ?", (task_id,))}
+    own = {q["id"]: q["field"] for q in conn.execute("SELECT id, field FROM question WHERE task_id = ?", (task_id,))}
+    masked = json.loads(row["privacy"])
     for a in answers:
         if a["question_id"] not in own:
             raise BadRequest(f"вопрос {a['question_id']} не относится к задаче {task_id}")
-        text = (a.get("answer") or "").strip()[:MAX_FIELD]
+        text, found = privacy.mask((a.get("answer") or "").strip()[:MAX_FIELD], own[a["question_id"]])
+        masked = privacy.merge(masked, found)
         conn.execute("UPDATE question SET answer = ? WHERE id = ?", (text or None, a["question_id"]))
+    conn.execute("UPDATE task SET privacy = ? WHERE id = ?", (json.dumps(masked, ensure_ascii=False), task_id))
 
     qa = [dict(q) for q in conn.execute("SELECT field, text, answer FROM question WHERE task_id = ? ORDER BY id", (task_id,))]
     card = {**_blank_card(), **json.loads(row["card"])}
@@ -168,10 +191,12 @@ def edit(conn: sqlite3.Connection, task_id: int, patch: dict) -> dict:
         raise BadRequest(f"неизвестные поля карточки: {', '.join(sorted(unknown))}")
     card = {**_blank_card(), **json.loads(row["card"])}
     sources = json.loads(row["sources"])
+    masked = json.loads(row["privacy"])
     for field, value in patch.items():
-        value = value.strip()
-        if len(value) > MAX_FIELD:
+        if len(value.strip()) > MAX_FIELD:
             raise BadRequest(f"поле {ai.LABELS[field]} длиннее {MAX_FIELD} символов")
+        value, found = privacy.mask(value.strip(), field)
+        masked = privacy.merge(masked, found)
         if value == card[field]:
             continue
         card[field] = value
@@ -180,9 +205,10 @@ def edit(conn: sqlite3.Connection, task_id: int, patch: dict) -> dict:
         else:
             sources.pop(field, None)
     conn.execute(
-        "UPDATE task SET card = ?, sources = ?, confirmed = 0,"
+        "UPDATE task SET card = ?, sources = ?, privacy = ?, confirmed = 0,"
         " status = CASE status WHEN 'new' THEN 'card' ELSE status END WHERE id = ?",
-        (json.dumps(card, ensure_ascii=False), json.dumps(sources, ensure_ascii=False), task_id),
+        (json.dumps(card, ensure_ascii=False), json.dumps(sources, ensure_ascii=False),
+         json.dumps(masked, ensure_ascii=False), task_id),
     )
     _log(conn, task_id, "edit", card, confirmed=False)
     return _out(conn, _row(conn, task_id))

@@ -18,6 +18,15 @@ def _words(value: str) -> set[str]:
     return {_stem(word) for word in re.findall(r"\w+", value.lower(), re.UNICODE)}
 
 
+def _team_stems(team: sqlite3.Row) -> dict[str, str]:
+    stems = {}
+    for field in ("interests", "skills", "technologies"):
+        for phrase in json.loads(team[field] or "[]"):
+            for word in re.findall(r"\w+", phrase.lower(), re.UNICODE):
+                stems.setdefault(_stem(word), word)
+    return stems
+
+
 def _summary(card: dict) -> str:
     value = (card.get("need") or card.get("context") or "").strip()
     return value if len(value) <= 160 else value[:159].rstrip() + "…"
@@ -35,6 +44,19 @@ def place(conn: sqlite3.Connection, score: int, task_id: int | None = None) -> d
         (score, task_id, task_id),
     ).fetchone()
     return {"place": row["ahead"] + 1, "of": row["others"] + 1}
+
+
+def audience(conn: sqlite3.Connection, industry: str, card: dict) -> list[dict]:
+    """Команды, которым подходит тема карточки, независимо от её уровня и статуса."""
+    task_words = _words(" ".join([industry or "", *(str(value) for value in card.values())]))
+    matches = []
+    rows = conn.execute("SELECT id, name, interests, skills, technologies FROM team ORDER BY id")
+    for team in rows:
+        common = [word for stem, word in _team_stems(team).items() if stem in task_words]
+        if common:
+            matches.append({"id": team["id"], "name": team["name"], "match": common})
+    matches.sort(key=lambda item: (-len(item["match"]), item["id"]))
+    return matches
 
 
 def listing(conn: sqlite3.Connection, industry: str | None = None, level: str | None = None) -> list[dict]:
@@ -89,14 +111,8 @@ def recommend(conn: sqlite3.Connection, team_id: int, limit: int = 5) -> list[di
     ).fetchone()
     if team is None:
         raise errors.NotFound("Команда не найдена")
-    team_words = []
-    for field in ("interests", "skills", "technologies"):
-        for phrase in json.loads(team[field] or "[]"):
-            team_words.extend(re.findall(r"\w+", phrase.lower(), re.UNICODE))
     # Keep the team's wording and order in the explanation; count each stem once.
-    team_stems = {}
-    for word in team_words:
-        team_stems.setdefault(_stem(word), word)
+    team_stems = _team_stems(team)
 
     matches = []
     rows = conn.execute(

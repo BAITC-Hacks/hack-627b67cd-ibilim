@@ -42,6 +42,24 @@ _SOURCE = re.compile(r"датчик|таблиц|выгруз|баз[аы]|crm|e
 _FORMAT = re.compile(r"\b(?:csv|xlsx?|json|sql|api|pdf)\b|excel", re.I)
 _METRIC = re.compile(r"точност|времен|скорост|ошиб|дол[яюи]|процент|выручк|охват|эконом|конверси|качеств|дн[яей]|час[аов]|минут", re.I)
 _CONSTRAINT = re.compile(r"срок|бюджет|стоимост|тенге|доступ|персональн|безопасност|зако|нельзя|только|конфиденциаль|обезлич", re.I)
+_FILLER = re.compile(
+    r"(?:см\.?\s*(?:выше|ниже)|смотри\s+выше|уточним\s+позже|уточняется|"
+    r"аналогично|tbd|todo|позже|дополним\s+позже|будет\s+позже)", re.I,
+)
+_KEYWORDS = {
+    "api", "crm", "csv", "erp", "excel", "json", "pdf", "sql", "xls", "xlsx",
+    "бюджет", "время", "выгрузка", "датчик", "датчики", "конверсия", "метрика",
+    "ошибки", "скорость", "срок", "таблица", "таблицы", "точность",
+}
+_VOWELS = set("aeiouyаеёиоуыэюяәіөүұ")
+_REPEATED = re.compile(r"([a-zа-яёәіөүұ])\1{3,}", re.I)
+_FIELD_LABELS = {
+    "context": "Контекст", "need": "Потребность", "users": "Пользователи",
+    "data": "Данные", "constraints": "Ограничения",
+    "expected_result": "Ожидаемый результат", "success_criteria": "Критерии успеха",
+    "contact": "Контакт", "interaction_format": "Формат взаимодействия",
+}
+_SCORED_FIELDS = tuple(field for field in FIELDS if field in _FIELD_LABELS)
 
 
 def _value(card: dict, key: str) -> str:
@@ -58,7 +76,7 @@ def _words(value: str) -> int:
     return len(re.findall(r"[A-Za-zА-Яа-яЁё0-9]+", value))
 
 
-def _parts(card: dict, key: str) -> list[tuple[int, bool, str, str]]:
+def _parts(card: dict, key: str, soup_fields: set[str] | frozenset[str] = frozenset()) -> list[tuple[int, bool, str, str]]:
     context = _value(card, "context")
     need = _value(card, "need")
     data = _value(card, "data")
@@ -78,8 +96,8 @@ def _parts(card: dict, key: str) -> list[tuple[int, bool, str, str]]:
     if key == "data":
         return [
             (8, _present(data), "данные или материалы описаны", "укажите имеющиеся данные или материалы"),
-            (6, _present(data) and bool(_SOURCE.search(data)), "назван источник данных", "назовите источник: выгрузка, датчики, CRM или документы"),
-            (3, _present(data) and bool(_FORMAT.search(data)), "указан формат данных", "укажите формат: CSV, Excel, JSON, API или PDF"),
+            (6, _present(data) and "data" not in soup_fields and bool(_SOURCE.search(data)), "назван источник данных", "назовите источник: выгрузка, датчики, CRM или документы"),
+            (3, _present(data) and "data" not in soup_fields and bool(_FORMAT.search(data)), "указан формат данных", "укажите формат: CSV, Excel, JSON, API или PDF"),
             (3, _present(data) and bool(_NUMBER.search(data)), "указан объём или период данных", "добавьте объём или период данных числом"),
         ]
     if key == "expected_result":
@@ -92,7 +110,7 @@ def _parts(card: dict, key: str) -> list[tuple[int, bool, str, str]]:
         return [
             (5, _present(criteria), "критерий указан", "укажите критерий успеха"),
             (7, _present(criteria) and bool(_NUMBER.search(criteria)), "задано числовое значение", "добавьте измеримый целевой показатель"),
-            (3, _present(criteria) and bool(_METRIC.search(criteria)), "названа измеряемая метрика", "назовите метрику: точность, время, ошибки или конверсия"),
+            (3, _present(criteria) and "success_criteria" not in soup_fields and bool(_METRIC.search(criteria)), "названа измеряемая метрика", "назовите метрику: точность, время, ошибки или конверсия"),
         ]
     if key == "constraints":
         return [
@@ -109,6 +127,92 @@ def _parts(card: dict, key: str) -> list[tuple[int, bool, str, str]]:
         (6, bool(_CONTACT.search(contact)), "есть проверяемый формат контакта", "укажите email, телефон, @ник или ссылку"),
         (4, _present(interaction), "указан формат взаимодействия", "укажите формат встреч или обратной связи"),
     ]
+
+
+def _total(card: dict, soup_fields: set[str] | frozenset[str] = frozenset()) -> int:
+    return sum(weight for key, _, _, _ in INDICATORS
+               for weight, passed, _, _ in _parts(card, key, soup_fields) if passed)
+
+
+def _tokens(value: str) -> list[str]:
+    return re.findall(r"[a-zа-яёәіөүұ0-9]+", value.lower())
+
+
+def _filler(value: str) -> bool:
+    return bool(_FILLER.fullmatch(value.strip().strip(" .,!?:;…—-")))
+
+
+def _gibberish(value: str) -> bool:
+    letters = re.findall(r"[a-zа-яёәіөүұ]+", value.lower())
+    if not letters:
+        return False
+    if any(_REPEATED.search(word) for word in letters):
+        return True
+    return any(len(word) >= 4 for word in letters) and not any(
+        char in _VOWELS for word in letters for char in word
+    ) and not all(word in _KEYWORDS for word in letters)
+
+
+def _keyword_soup(value: str) -> bool:
+    words = _tokens(value)
+    return bool(words) and len(words) < 5 and sum(word in _KEYWORDS for word in words) / len(words) >= 0.8
+
+
+def _duplicate(value: str, previous: str) -> bool:
+    words, earlier = set(_tokens(value)), set(_tokens(previous))
+    return bool(words and earlier) and len(words & earlier) / max(len(words), len(earlier)) >= 0.8
+
+
+def _penalties(card: dict) -> list[dict]:
+    effective = dict(card)
+    penalties = []
+    current = _total(effective)
+
+    for field in _SCORED_FIELDS:
+        value = _value(effective, field)
+        if not value:
+            continue
+        key = "filler" if _filler(value) else "gibberish" if _gibberish(value) else None
+        if key is None:
+            continue
+        effective[field] = ""
+        updated = _total(effective)
+        points = current - updated
+        if points:
+            label = "Отписка" if key == "filler" else "Бессмысленный текст"
+            penalties.append({"key": key, "label": label, "points": points,
+                              "explain": f"Поле «{_FIELD_LABELS[field]}» не содержит полезного описания — его баллы сняты"})
+        current = updated
+
+    seen = []
+    for field in _SCORED_FIELDS:
+        value = _value(effective, field)
+        if not _present(value):
+            continue
+        repeated = next((earlier for earlier in seen if _duplicate(value, _value(effective, earlier))), None)
+        if repeated is None:
+            seen.append(field)
+            continue
+        effective[field] = ""
+        updated = _total(effective)
+        points = current - updated
+        if points:
+            penalties.append({"key": "duplicate", "label": "Повтор текста", "points": points,
+                              "explain": f"Поля «{_FIELD_LABELS[repeated]}» и «{_FIELD_LABELS[field]}» почти совпадают — текст засчитан один раз"})
+        current = updated
+
+    soup_fields: set[str] = set()
+    for field in ("data", "success_criteria"):
+        if not _keyword_soup(_value(effective, field)):
+            continue
+        soup_fields.add(field)
+        updated = _total(effective, soup_fields)
+        points = current - updated
+        if points:
+            penalties.append({"key": "keyword_soup", "label": "Набор ключевых слов", "points": points,
+                              "explain": f"В поле «{_FIELD_LABELS[field]}» перечислены ключевые слова без описания — бонусы сняты"})
+        current = updated
+    return penalties
 
 
 def score(card: dict) -> dict:
@@ -142,6 +246,8 @@ def score(card: dict) -> dict:
         if points < maximum:
             next_best.append({"key": key, "label": label, "gain": maximum - points, "hint": hint})
     next_best.sort(key=lambda item: -item["gain"])
+    penalties = _penalties(card)
+    total = max(0, total - sum(item["points"] for item in penalties))
     key, label = level(total)
     next_level = next(
         ({"key": next_key, "label": next_label, "points_needed": minimum - total}
@@ -151,5 +257,5 @@ def score(card: dict) -> dict:
     return {
         "score": total, "level": key, "level_label": label,
         "breakdown": breakdown, "missing": missing, "next_best": next_best,
-        "next_level": next_level,
+        "next_level": next_level, "penalties": penalties,
     }

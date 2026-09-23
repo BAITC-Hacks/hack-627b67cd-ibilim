@@ -31,6 +31,7 @@ def test_full_card_is_100_and_has_no_hints():
     assert result["level"] == "priority"
     assert result["missing"] == result["next_best"] == []
     assert result["next_level"] is None
+    assert result["penalties"] == []
     assert all(row["points"] == row["max"] and not row["hint"] for row in result["breakdown"])
 
 
@@ -59,6 +60,81 @@ def test_partial_points_and_gain_order():
     assert [row["gain"] for row in result["next_best"]] == sorted(
         [row["gain"] for row in result["next_best"]], reverse=True
     )
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ("Полив 120 полей сейчас планируют вручную каждое утро по графику",
+         "Полив 120 полей сейчас планируют вручную каждое утро по графику"),
+        ("Полив 120 полей сейчас планируют вручную каждое утро по графику",
+         "Полив 120 полей сейчас планируют вручную каждое утро по графику регулярно"),
+        ("Полив 120 полей планируют вручную", "Полив 120 полей планируют ежедневно"),
+    ],
+)
+def test_duplicate_text_is_counted_once(first, second):
+    result = rating.score({"context": first, "need": second})
+    assert result["score"] == 10
+    assert result["penalties"] == [{
+        "key": "duplicate", "label": "Повтор текста", "points": 10,
+        "explain": "Поля «Контекст» и «Потребность» почти совпадают — текст засчитан один раз",
+    }]
+    assert result["score"] == sum(item["points"] for item in result["breakdown"]) - sum(
+        item["points"] for item in result["penalties"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "points"),
+    [("data", "csv api excel json", 9), ("success_criteria", "точность скорость", 3)],
+)
+def test_keyword_soup_loses_only_source_format_or_metric_bonus(field, value, points):
+    result = rating.score({field: value})
+    assert [(item["key"], item["points"]) for item in result["penalties"]] == [
+        ("keyword_soup", points)
+    ]
+    assert result["score"] == sum(item["points"] for item in result["breakdown"]) - points
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("context", "см. выше"), ("need", "уточним позже"),
+     ("expected_result", "аналогично"), ("data", "tbd"), ("constraints", "todo")],
+)
+def test_filler_field_earns_no_points(field, value):
+    result = rating.score({field: value})
+    assert result["score"] == 0
+    assert result["penalties"][0]["key"] == "filler"
+    assert result["penalties"][0]["points"] == sum(item["points"] for item in result["breakdown"])
+
+
+@pytest.mark.parametrize("value", ["кртмпл", "аааааа"])
+def test_gibberish_field_earns_no_points(value):
+    result = rating.score({"users": value})
+    assert result["score"] == 0
+    assert result["penalties"][0]["key"] == "gibberish"
+    assert result["penalties"][0]["points"] == 6
+
+
+def test_short_honest_success_criterion_is_not_penalized():
+    result = rating.score({"success_criteria": "точность прогноза не ниже 80%"})
+    assert result["score"] == 15
+    assert result["penalties"] == []
+
+
+def test_combined_penalties_reconcile_with_breakdown_and_next_level():
+    result = rating.score({
+        "context": "см. выше", "need": "см. выше",
+        "data": "csv api excel json", "users": "кртмпл",
+    })
+    assert {item["key"] for item in result["penalties"]} == {
+        "filler", "gibberish", "keyword_soup",
+    }
+    assert result["score"] == max(
+        0, sum(item["points"] for item in result["breakdown"])
+        - sum(item["points"] for item in result["penalties"]),
+    ) == 8
+    assert result["next_level"]["points_needed"] == 32
 
 
 @pytest.mark.parametrize("placeholder", ["-", "—", "нет", "не знаю", "?", " нет. "])

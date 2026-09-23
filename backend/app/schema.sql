@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS task (
   score          INTEGER,                -- официальный рейтинг, считается по confirmed_card
   level          TEXT,                   -- draft | working | ready | priority
   ai_meta        TEXT DEFAULT '{}',      -- mode (llm | stub), attempts, warnings
+  privacy        TEXT DEFAULT '[]',      -- что замаскировано: ИИН, номера карт (privacy.py)
   created_at     TEXT DEFAULT (datetime('now')),
   published_at   TEXT
 );
