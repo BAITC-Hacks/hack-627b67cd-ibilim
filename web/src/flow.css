@@ -113,3 +113,7 @@
   .timeline-point strong{grid-column:3;grid-row:1;font-size:1.55rem;white-space:nowrap}
   .timeline-point:not(:last-child):after{content:'↓';top:auto;right:auto;bottom:-20px;left:29px}
 }
+
+.readonly-fields a{color:#2a7181;text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}
+.readonly-fields a:hover{color:#aa7039}
+.readonly-fields a:focus-visible{outline:2px solid #aa7039;outline-offset:3px;border-radius:2px}
