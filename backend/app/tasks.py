@@ -118,6 +118,32 @@ def _out(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
     }
 
 
+def assist_input(conn: sqlite3.Connection, task_id: int) -> tuple[str, dict, list[dict]]:
+    """Текст бизнеса, карточка и слабые поля (по next_best) для помощника — до вызова модели."""
+    row = _row(conn, task_id)
+    card = {**_blank_card(), **json.loads(row["card"])}
+    answers = [q["answer"] for q in conn.execute("SELECT answer FROM question WHERE task_id = ? AND answer IS NOT NULL", (task_id,))]
+    fields_of = {key: fields for key, _, _, fields in rating.INDICATORS}
+    weak = []
+    for item in rating.score(card)["next_best"][:3]:
+        for field in fields_of[item["key"]]:
+            weak.append({"field": field, "hint": item["hint"]})
+    return "\n".join([row["draft_text"], *answers]), card, weak
+
+
+def assist_result(card: dict, result: dict) -> dict:
+    """Каждому предложению — прирост балла, если его применить; бесполезные отбрасываются."""
+    base = rating.score(card)["score"]
+    out = []
+    for item in result["items"]:
+        after = rating.score({**card, item["field"]: item["value"]})["score"]
+        if after > base:
+            out.append({**item, "label": ai.LABELS[item["field"]], "current": card[item["field"]],
+                        "gain": after - base, "then_score": after})
+    out.sort(key=lambda s: -s["gain"])
+    return {"suggestions": out[:3], "ai": result["ai"]}
+
+
 def create(conn: sqlite3.Connection, business_id: int, draft_text: str, industry: str) -> dict:
     draft_text = draft_text.strip()
     if not draft_text:

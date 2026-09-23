@@ -179,6 +179,13 @@ def student_check(task_id: int) -> dict:
     return ai.student_check(card)  # вызов модели — вне транзакции
 
 
+@app.post("/api/tasks/{task_id}/assist")
+def assist_card(task_id: int) -> dict:
+    with _tx() as conn:
+        texts, card, weak = tasks.assist_input(conn, task_id)
+    return tasks.assist_result(card, ai.assist(texts, card, weak))  # модель — вне транзакции
+
+
 @app.get("/api/stats")
 def program_stats() -> dict:
     with _tx() as conn:

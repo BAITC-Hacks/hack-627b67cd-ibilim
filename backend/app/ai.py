@@ -313,6 +313,34 @@ def student_check(card: dict) -> dict:
                 "ai": {"mode": "stub", "attempts": exc.attempts, "warnings": [f"ИИ недоступен: {exc}"]}}
 
 
+# --- помощник карточки: готовые формулировки для слабых полей ---------------------------------
+
+ASSIST_SYSTEM = (
+    "Ты помогаешь представителю бизнеса улучшить карточку задачи для студентов. Тебе дают текст "
+    "бизнеса (черновик и ответы), текущую карточку и список слабых полей с подсказками, чего не "
+    "хватает. Для каждого слабого поля перепиши значение так, чтобы оно было полнее и конкретнее, "
+    "но только из сведений, которые есть в тексте бизнеса или других полях карточки. "
+    + _RULES
+)
+
+
+def assist(texts: str, card: dict, weak: list[dict]) -> dict:
+    """weak = [{"field", "hint"}] → {"items": [{field, value, quote}], "ai"}. Проверка — та же, что у карточки."""
+    source = "\n".join([texts, *[v for v in card.values() if v]])
+    user = json.dumps({"text": texts, "card": {f: v for f, v in card.items() if v},
+                       "weak_fields": weak, "fields": LABELS}, ensure_ascii=False)
+    try:
+        data, attempts = llm.call_json("assist_card", ASSIST_SYSTEM, user, CARD_SCHEMA)
+        wanted = {w["field"] for w in weak}
+        items_in = [i for i in data["fields"] if i.get("field") in wanted and i.get("value", "").strip() != card.get(i.get("field"), "")]
+        new_card, sources, warnings = _verify(items_in, source)
+        items = [{"field": f, "value": v, "quote": sources[f]} for f, v in new_card.items()]
+        return {"items": items, "ai": {"mode": "llm", "attempts": attempts, "warnings": warnings}}
+    except llm.LLMUnavailable as exc:
+        return {"items": [], "ai": {"mode": "stub", "attempts": exc.attempts,
+                                    "warnings": [f"ИИ недоступен: {exc} — помощник работает только с ИИ"]}}
+
+
 def spec() -> dict:
     """Промпты, формат входа и выхода, обработка некорректного ответа — то, что ТЗ §5 требует показать."""
     return {
@@ -345,6 +373,15 @@ def spec() -> dict:
                 "input_example": {"card": {"need": "Понять, какие поля скоро потребуют полива",
                                            "data": "выгрузка с датчиков"}, "fields": LABELS},
                 "output_schema": STUDENT_SCHEMA,
+            },
+            {
+                "name": "assist_card",
+                "purpose": "помощник: готовые формулировки для слабых полей из текста бизнеса",
+                "system": ASSIST_SYSTEM,
+                "input_example": {"text": "Хотим понимать, какие поля скоро потребуют полива",
+                                  "weak_fields": [{"field": "success_criteria", "hint": "добавьте измеримый целевой показатель"}],
+                                  "fields": LABELS},
+                "output_schema": CARD_SCHEMA,
             },
         ],
         "validation": [
