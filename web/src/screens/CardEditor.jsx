@@ -8,6 +8,7 @@ import RatingTimeline from '../components/RatingTimeline.jsx'
 import PrivacyNotice from '../components/PrivacyNotice.jsx'
 import StudentCheck from '../components/StudentCheck.jsx'
 import AiWarnings from '../components/AiWarnings.jsx'
+import CardAssist from '../components/CardAssist.jsx'
 
 export default function CardEditor({ task, onTaskChange }) {
   const { meta } = useApp()
@@ -17,8 +18,11 @@ export default function CardEditor({ task, onTaskChange }) {
   const [previewing, setPreviewing] = useState(false)
   const [error, setError] = useState('')
   const [rankGain, setRankGain] = useState(0)
+  const [assistantBusy, setAssistantBusy] = useState(false)
+  const [assistantApplied, setAssistantApplied] = useState(false)
   const changes = useMemo(() => Object.fromEntries((meta?.fields || []).filter(({ key }) => card[key] !== task.card[key]).map(({ key }) => [key, card[key]])), [card, task.card, meta])
   const hasChanges = Object.keys(changes).length > 0
+  const actionBusy = !!activeAction || assistantBusy
 
   useEffect(() => {
     if (!hasChanges) { setRating(task.rating); setPreviewing(false); return }
@@ -38,7 +42,7 @@ export default function CardEditor({ task, onTaskChange }) {
   }, [card, hasChanges, task.rating])
 
   async function save() {
-    if (!hasChanges || activeAction) return
+    if (!hasChanges || actionBusy) return
     setActiveAction('save')
     setError('')
     try {
@@ -55,7 +59,7 @@ export default function CardEditor({ task, onTaskChange }) {
   }
 
   async function confirm() {
-    if (hasChanges || activeAction) return
+    if (hasChanges || actionBusy) return
     setActiveAction('confirm')
     setError('')
     try {
@@ -68,7 +72,7 @@ export default function CardEditor({ task, onTaskChange }) {
   }
 
   async function publish() {
-    if (!task.confirmed || hasChanges || activeAction) return
+    if (!task.confirmed || hasChanges || actionBusy) return
     setActiveAction('publish')
     setError('')
     try { onTaskChange(await publishTask(task.id)) }
@@ -80,6 +84,15 @@ export default function CardEditor({ task, onTaskChange }) {
     const control = document.getElementById(`card-${key}`)
     control?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     control?.focus({ preventScroll: true })
+  }
+
+  function applyAssistantResult(result, field) {
+    onTaskChange(result)
+    setCard(result.card)
+    setRating(result.rating)
+    setRankGain(0)
+    setAssistantApplied(true)
+    focusField(field)
   }
 
   return <section className="flow-page task-flow-page">
@@ -95,10 +108,11 @@ export default function CardEditor({ task, onTaskChange }) {
       <div className="surface draft-card"><span className="section-kicker">ВАШ ЧЕРНОВИК · {task.industry}</span><p>{task.draft_text}</p></div>
       <div className="card-editor"><div className="section-heading"><div><span className="section-kicker">ШАГ 03 / 04</span><h2>Карточка задачи</h2></div><span>{hasChanges ? 'Есть несохранённые изменения' : 'Все изменения сохранены'}</span></div>
         <div className="card-fields">{meta?.fields?.map(({ key, label }) => <div className="surface editor-field" key={key}><div className="editor-field-heading"><label className="field-label" htmlFor={`card-${key}`}>{label}</label>{task.sources?.[key] && task.sources[key] !== 'manual' && <span className="citation-mark" title={task.sources[key]} aria-label={`Цитата: ${task.sources[key]}`}>“ <span>цитата</span></span>}</div>{key === 'title' ? <input id={`card-${key}`} className="field-control" value={card[key] || ''} onChange={(event) => setCard((current) => ({ ...current, [key]: event.target.value }))} /> : <textarea id={`card-${key}`} className="field-control" rows={3} value={card[key] || ''} onChange={(event) => setCard((current) => ({ ...current, [key]: event.target.value }))} />}</div>)}</div>
-        <div className="editor-actions"><button type="button" className="primary-button" onClick={save} disabled={!hasChanges || !!activeAction}>{activeAction === 'save' ? 'Сохраняем…' : 'Сохранить изменения'}</button>{activeAction === 'save' && <Loader>Сохраняем карточку…</Loader>}</div>
+        <div className="editor-actions"><button type="button" className="primary-button" onClick={save} disabled={!hasChanges || actionBusy}>{activeAction === 'save' ? 'Сохраняем…' : 'Сохранить изменения'}</button>{activeAction === 'save' && <Loader>Сохраняем карточку…</Loader>}</div>
       </div>
+      <CardAssist task={task} hasChanges={hasChanges} busy={!!activeAction} onBusyChange={setAssistantBusy} onApplied={applyAssistantResult} />
       <StudentCheck key={`${task.id}-${task.history?.length || 0}`} taskId={task.id} hasChanges={hasChanges} onFocusField={focusField} />
-      <div className="publish-panel surface"><span className="section-kicker">ШАГ 04 / 04</span><h2>Подтвердить и опубликовать</h2><p>После подтверждения рейтинг становится официальным. Позиция опубликованной задачи в каталоге обновится.</p><div className="publish-actions"><button type="button" className="secondary-button" onClick={confirm} disabled={hasChanges || !!activeAction}>{activeAction === 'confirm' ? 'Подтверждаем…' : task.confirmed ? 'Подтвердить снова' : 'Подтвердить карточку'}</button><button type="button" className="primary-button" onClick={publish} disabled={!task.confirmed || hasChanges || !!activeAction || task.status === 'published'}>{activeAction === 'publish' ? 'Публикуем…' : task.status === 'published' ? 'Опубликована' : 'Опубликовать'}</button></div>{task.status === 'published' && <a className="text-link" href="#/catalog">Посмотреть в каталоге →</a>}</div>
+      <div className="publish-panel surface"><span className="section-kicker">ШАГ 04 / 04</span><h2>Подтвердить и опубликовать</h2><p>После подтверждения рейтинг становится официальным. Позиция опубликованной задачи в каталоге обновится.</p>{assistantApplied && !task.confirmed && <p className="assist-confirm-note">Применённый текст нужно подтвердить — только тогда меняется место в каталоге.</p>}<div className="publish-actions"><button type="button" className="secondary-button" onClick={confirm} disabled={hasChanges || actionBusy}>{activeAction === 'confirm' ? 'Подтверждаем…' : task.confirmed ? 'Подтвердить снова' : 'Подтвердить карточку'}</button><button type="button" className="primary-button" onClick={publish} disabled={!task.confirmed || hasChanges || actionBusy || task.status === 'published'}>{activeAction === 'publish' ? 'Публикуем…' : task.status === 'published' ? 'Опубликована' : 'Опубликовать'}</button></div>{task.status === 'published' && <a className="text-link" href="#/catalog">Посмотреть в каталоге →</a>}</div>
       {rankGain > 0 && <div className="rank-gain" role="status">Поднялись на {rankGain} {rankGain === 1 ? 'место' : rankGain < 5 ? 'места' : 'мест'} после подтверждения.</div>}
     </div><div className="task-sidebar"><span className="section-kicker">ТЕКУЩИЙ РЕЙТИНГ {previewing ? '· ПЕРЕСЧИТЫВАЕМ…' : ''}</span><RatingPanel rating={rating} hasChanges={hasChanges} />{task.position && <div className="position-card surface"><span className="section-kicker">МЕСТО В КАТАЛОГЕ</span><strong>#{task.position.place} <small>из {task.position.of}</small></strong><span>{task.position.projected ? 'Если подтвердить и опубликовать' : 'Текущая позиция'}</span>{hasChanges && <p>Прогноз места обновится после сохранения.</p>}</div>}{task.audience && <div className="audience-card surface"><span className="section-kicker">КОМУ ПОДОЙДЁТ ЗАДАЧА</span>{task.audience.teams?.length ? <ul>{task.audience.teams.map((team) => <li key={team.id}><strong>{team.name}</strong><span>{team.match?.join(' · ')}</span></li>)}</ul> : <p>Совпадений с профилями команд пока нет.</p>}<p>{task.audience.recommended ? 'После публикации задача сможет попасть в рекомендации этим командам.' : `Рекомендации откроются с уровня «${meta?.levels?.find((level) => level.key === 'working')?.label || 'рабочая'}». В каталоге задача будет видна и раньше.`}</p>{hasChanges && <p>Аудитория обновится после сохранения.</p>}</div>}<div className="official-score surface"><span className="section-kicker">В КАТАЛОГЕ</span><strong>{task.official ? task.official.score : '—'}<small>{task.official ? ' / 100' : 'пока нет'}</small></strong>{(!task.confirmed || task.official?.score !== rating.score) && <p>Подтвердите, чтобы позиция в каталоге обновилась.</p>}</div></div></div>
   </section>

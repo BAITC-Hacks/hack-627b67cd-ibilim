@@ -259,6 +259,35 @@ function studentCheck(id) {
   }
 }
 
+function assistTask(id) {
+  const task = taskById(id)
+  const sources = [task.draft_text, ...task.questions.map((question) => question.answer), ...Object.values(task.card)]
+    .map((text) => String(text || '').trim()).filter(Boolean)
+  const patterns = {
+    context: /сейчас|вручную|проблем|каждый день/i,
+    need: /хотим|нужно|нужен|сократ|требу/i,
+    users: /агроном|сотрудник|диспетчер|аналитик|человек|пользоват|оператор/i,
+    data: /данн|csv|excel|датчик|выгруз|api|карта пол/i,
+    constraints: /срок|недел|месяц|бюджет|только|доступ|не вынос/i,
+    expected_result: /хотим|нужен|прототип|дашборд|отчёт|модель|сервис|панель/i,
+    success_criteria: /\d+\s*%|не ниже|не более|точност|за \d+|в течение \d+/i,
+    contact: /@|телеграм|telegram|почта|email/i,
+    interaction_format: /созвон|связ|встреч|вопрос|обратн/i,
+  }
+  const base = rate(task.card).score
+  const fields = rate(task.card).next_best.flatMap((item) => meta.indicators.find((indicator) => indicator.key === item.key)?.fields || [])
+  const suggestions = fields.filter((field) => !String(task.card[field] || '').trim()).map((field) => {
+    const quote = sources.find((source) => patterns[field]?.test(source))
+    if (!quote) return null
+    const thenScore = rate({ ...task.card, [field]: quote }).score
+    return { field, label: meta.fields.find((item) => item.key === field)?.label || field,
+      current: task.card[field] || '', value: quote, quote, gain: thenScore - base, then_score: thenScore }
+  }).filter((item) => item?.gain > 0).slice(0, 3)
+  return { suggestions, ai: suggestions.length
+    ? { mode: 'llm', attempts: 1, warnings: [] }
+    : { mode: 'stub', attempts: 0, warnings: ['В демо нет подходящих цитат для новых формулировок. Помощник работает с исходными словами бизнеса.'] } }
+}
+
 function catalog(industry, level) {
   return state.tasks.filter((task) => task.status === 'published')
     .filter((task) => !industry || task.industry === industry)
@@ -385,6 +414,7 @@ export async function mockRequest(method, path, body) {
   if ((match = route.match(/^\/tasks\/(\d+)\/card$/)) && method === 'PUT') return updateCard(match[1], body)
   if ((match = route.match(/^\/tasks\/(\d+)\/confirm$/)) && method === 'POST') return confirmTask(match[1])
   if ((match = route.match(/^\/tasks\/(\d+)\/publish$/)) && method === 'POST') return publishTask(match[1])
+  if ((match = route.match(/^\/tasks\/(\d+)\/assist$/)) && method === 'POST') return assistTask(match[1])
   if ((match = route.match(/^\/tasks\/(\d+)\/student-check$/)) && method === 'POST') return studentCheck(match[1])
   if (method === 'POST' && route === '/rating/preview') return rate(body.card)
   if (method === 'GET' && route === '/catalog') return copy(catalog(url.searchParams.get('industry'), url.searchParams.get('level')))

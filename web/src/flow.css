@@ -117,3 +117,28 @@
 .readonly-fields a{color:#2a7181;text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}
 .readonly-fields a:hover{color:#aa7039}
 .readonly-fields a:focus-visible{outline:2px solid #aa7039;outline-offset:3px;border-radius:2px}
+
+.card-assist{margin-top:34px;padding:25px 29px}
+.card-assist h2{font-size:1.55rem;margin:9px 0}
+.card-assist>p{font-size:.85rem;line-height:1.55;color:#738780;max-width:65ch}
+.card-assist>.secondary-button{margin-top:8px}
+.card-assist .assist-help,.card-assist .assist-stale{font-size:.77rem;color:#996632;margin:11px 0 0}
+.card-assist .assist-stale{padding:10px 12px;background:#fff5e6;border-radius:7px}
+.assist-suggestions{display:grid;gap:12px;margin-top:21px}
+.assist-suggestion{border:1px solid #dfe8df;border-radius:10px;padding:18px 19px;background:#fbfcf9}
+.assist-suggestion-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.assist-suggestion-heading .field-tag{margin:0}
+.assist-suggestion-heading strong{font-size:1.05rem;color:#47735a}
+.assist-suggestion-heading small{font-size:.74rem;font-weight:600;color:#71867a}
+.assist-current{font-size:.8rem;color:#8c9990;margin:14px 0 7px;white-space:pre-wrap}
+.assist-current span{font-weight:800}
+.assist-value{font-size:.91rem;color:#294b42;margin:12px 0 9px;white-space:pre-wrap}
+.assist-source{font-size:.72rem;color:#7d907f;background:#f0f5ef;border-radius:6px;padding:9px 11px;margin:0;white-space:pre-wrap}
+.assist-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+.assist-actions button{min-height:41px;padding:9px 15px}
+.assist-empty{margin:19px 0 0!important}
+.assist-warnings{margin-top:17px;font-size:.76rem;color:#71847b}
+.assist-warnings summary{cursor:pointer;font-weight:800}
+.assist-warnings ul{margin:8px 0 0;padding-left:20px}
+.publish-panel .assist-confirm-note{padding:10px 13px;border-radius:7px;background:#fff3df;color:#8c622d;font-weight:750}
+@media(max-width:650px){.card-assist{padding:21px}.assist-suggestion{padding:16px}.assist-actions{flex-direction:column}.assist-actions button{width:100%}}
